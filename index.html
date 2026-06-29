@@ -160,6 +160,7 @@
         <button class="subtab active" data-sub="add">➕ Tambah Karyawan</button>
         <button class="subtab" data-sub="emp">📋 Data Karyawan</button>
         <button class="subtab" data-sub="hist">🕘 Riwayat Absensi</button>
+        <button class="subtab" data-sub="pass">🔑 Ubah Password</button>
         <button class="subtab admin-only" data-sub="users">👥 Kelola Akun</button>
         <button class="subtab admin-only" data-sub="settings">⚙️ Pengaturan</button>
       </div>
@@ -211,6 +212,17 @@
           <button class="btn" id="refreshBtn">🔄 Muat Ulang</button>
         </div>
         <div id="histTableWrap"></div>
+      </div>
+
+      <div id="sub-pass" class="panel" style="display:none;max-width:420px;margin-left:auto;margin-right:auto;">
+        <h2>Ubah Password Saya</h2>
+        <div class="form-grid">
+          <input type="password" id="curPassword" placeholder="Password saat ini">
+          <input type="password" id="newPassword" placeholder="Password baru">
+          <input type="password" id="newPassword2" placeholder="Ulangi password baru">
+          <button id="changePassBtn" class="btn primary">Simpan Password Baru</button>
+          <div id="changePassStatus" class="small"></div>
+        </div>
       </div>
 
       <div id="sub-users" class="panel" style="display:none;">
@@ -514,6 +526,30 @@
   });
 
   // ---------- USERS (Kelola Akun) ----------
+  $("changePassBtn").addEventListener('click', async ()=>{
+    const cur = $("curPassword").value;
+    const n1 = $("newPassword").value;
+    const n2 = $("newPassword2").value;
+    if(!cur || !n1 || !n2){ $("changePassStatus").textContent = "Lengkapi semua field."; return; }
+    if(n1.length < 6){ $("changePassStatus").textContent = "Password baru minimal 6 karakter."; return; }
+    if(n1 !== n2){ $("changePassStatus").textContent = "Konfirmasi password baru tidak cocok."; return; }
+    $("changePassBtn").disabled = true; $("changePassBtn").textContent = "Menyimpan...";
+    try{
+      const res = await apiPost({action:'changePassword', id:currentUser.id, currentPassword:cur, newPassword:n1});
+      if(res.status==='ok'){
+        $("changePassStatus").textContent = "Password berhasil diubah ✅";
+        $("changePassStatus").className = "small status-line ok";
+        $("curPassword").value=""; $("newPassword").value=""; $("newPassword2").value="";
+      } else {
+        $("changePassStatus").textContent = res.message || "Gagal mengubah password.";
+        $("changePassStatus").className = "small status-line fail";
+      }
+    }catch(err){
+      $("changePassStatus").textContent = "Gagal menghubungi server.";
+      $("changePassStatus").className = "small status-line fail";
+    }
+    $("changePassBtn").disabled = false; $("changePassBtn").textContent = "Simpan Password Baru";
+  });
   $("addUserBtn").addEventListener('click', async ()=>{
     const name = $("newUserName").value.trim();
     const email = $("newUserEmail").value.trim();
@@ -675,7 +711,7 @@
     btn.addEventListener('click', ()=>{
       document.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      ['add','emp','hist','users','settings'].forEach(s=>{ $("sub-"+s).style.display = (s===btn.dataset.sub) ? "" : "none"; });
+      ['add','emp','hist','pass','users','settings'].forEach(s=>{ $("sub-"+s).style.display = (s===btn.dataset.sub) ? "" : "none"; });
       if(btn.dataset.sub==='hist') refreshAttendance();
       if(btn.dataset.sub==='emp') refreshEmployees();
       if(btn.dataset.sub==='users') refreshUsers();

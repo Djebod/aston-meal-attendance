@@ -35,6 +35,10 @@
   .scan-ring.ok{box-shadow: inset 0 0 0 4px var(--success);}
   .scan-ring.fail{box-shadow: inset 0 0 0 4px var(--danger);}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .face-guide{position:absolute;top:48%;left:50%;width:52%;height:72%;transform:translate(-50%,-50%);
+    border:3px dashed rgba(0,194,168,0.65);border-radius:50%;pointer-events:none;}
+  .face-guide-label{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:.68rem;
+    color:rgba(255,255,255,.85);pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.7);font-weight:600;}
   .meal-badge{display:inline-block;margin:14px auto 6px;padding:6px 16px;border-radius:999px;font-weight:700;
     font-size:.85rem;background:rgba(0,194,168,.15);color:var(--accent);border:1px solid rgba(0,194,168,.4);}
   .meal-badge.off{background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--panel-border);}
@@ -47,8 +51,8 @@
   .status-line.fail{color:var(--danger);font-weight:700;}
   .center{text-align:center;}
   .form-grid{display:grid;gap:10px;max-width:420px;margin:0 auto;}
-  input[type=text]{padding:11px 14px;border-radius:10px;border:1px solid var(--panel-border);
-    background:rgba(255,255,255,.04);color:var(--text);font-size:.9rem;}
+  input[type=text],input[type=password],input[type=email]{padding:11px 14px;border-radius:10px;border:1px solid var(--panel-border);
+    background:rgba(255,255,255,.04);color:var(--text);font-size:.9rem;width:100%;}
   input::placeholder{color:var(--muted);}
   .btn{padding:10px 18px;border-radius:10px;border:1px solid var(--panel-border);background:rgba(255,255,255,.06);
     color:var(--text);cursor:pointer;font-weight:600;font-size:.85rem;}
@@ -81,18 +85,17 @@
   .tag.lunch{background:rgba(255,193,7,.15);color:#ffc107;}
   .tag.dinner{background:rgba(108,92,231,.18);color:#a18bff;}
   .tag.supper{background:rgba(0,194,168,.15);color:var(--accent);}
+  .tag.admin{background:rgba(108,92,231,.2);color:#a18bff;}
+  .tag.staff{background:rgba(0,194,168,.15);color:var(--accent);}
   .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
   .small{font-size:.75rem;color:var(--muted);text-align:center;margin-top:6px;}
   .photo-preview{width:90px;height:90px;border-radius:50%;object-fit:cover;display:block;margin:10px auto;border:2px solid var(--panel-border);}
-  .face-guide{position:absolute;top:48%;left:50%;width:52%;height:72%;transform:translate(-50%,-50%);
-    border:3px dashed rgba(0,194,168,0.65);border-radius:50%;pointer-events:none;}
-  .face-guide-label{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:.68rem;
-    color:rgba(255,255,255,.85);pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.7);font-weight:600;}
   #gate{position:fixed;inset:0;background:#0b0f12;display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;}
   #gate .box{max-width:420px;width:100%;}
-  .spinner{width:34px;height:34px;border:3px solid var(--panel-border);border-top-color:var(--accent);
-    border-radius:50%;animation:spin 1s linear infinite;margin:14px auto;}
-  @keyframes spin{to{transform:rotate(360deg);}}
+  .topbar-admin{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;
+    font-size:.8rem;color:var(--muted);}
+  .panel-header-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+  select.role-select{padding:5px 8px;font-size:.75rem;}
 </style>
 </head>
 <body>
@@ -100,7 +103,7 @@
 <div id="gate">
   <div class="box panel">
     <h2 class="center">🔧 Setup Awal</h2>
-    <p class="small">Tempel URL Web App Google Apps Script Anda (dipakai sebagai database absensi & data karyawan).</p>
+    <p class="small">Tempel URL Web App Google Apps Script Anda (dipakai sebagai database & autentikasi login).</p>
     <div class="form-grid">
       <input type="text" id="gateUrl" placeholder="https://script.google.com/macros/s/.../exec">
       <button id="gateSaveBtn" class="btn primary">Simpan & Mulai</button>
@@ -116,8 +119,8 @@
   </header>
 
   <div class="tabbar">
-    <button id="tabStaffBtn" class="active">👤 Staff</button>
-    <button id="tabAdminBtn">🛠️ Admin</button>
+    <button id="tabStaffBtn" class="active">👤 Absen Staff</button>
+    <button id="tabAdminBtn">🛠️ Dashboard</button>
   </div>
 
   <div id="staffView">
@@ -136,75 +139,123 @@
   </div>
 
   <div id="adminView" style="display:none;">
-    <div class="subtabbar">
-      <button class="subtab active" data-sub="add">➕ Tambah Karyawan</button>
-      <button class="subtab" data-sub="emp">📋 Data Karyawan</button>
-      <button class="subtab" data-sub="hist">🕘 Riwayat Absensi</button>
-      <button class="subtab" data-sub="settings">⚙️ Pengaturan</button>
-    </div>
 
-    <div id="sub-add" class="panel">
-      <h2>Tambah Karyawan Baru</h2>
-      <div class="cam-box" style="max-width:300px;margin-bottom:14px;">
-        <video id="adminVideo" autoplay muted playsinline></video>
-        <div class="face-guide"></div>
-        <div class="face-guide-label">Posisikan wajah di dalam oval</div>
-        <div class="scan-ring" id="adminRing"></div>
-      </div>
+    <div id="adminLoginGate" class="panel" style="max-width:380px;margin:0 auto;">
+      <h2 class="center">🔒 Login Dashboard</h2>
       <div class="form-grid">
-        <input type="text" id="empName" placeholder="Nama Karyawan">
-        <input type="text" id="empPos" placeholder="ID / Jabatan (contoh: HK-002, Waiter)">
-        <div class="row"><button id="captureFaceBtn" class="btn">📸 Ambil Foto Wajah</button></div>
-        <img id="capturedPreview" class="photo-preview" style="display:none;">
-        <div id="addStatus" class="small"></div>
-        <button id="saveEmpBtn" class="btn primary" disabled>Simpan Karyawan</button>
+        <input type="email" id="adminEmail" placeholder="Email">
+        <input type="password" id="adminPassword" placeholder="Password">
+        <button id="adminLoginBtn" class="btn primary">Login</button>
+        <div id="adminLoginStatus" class="small"></div>
       </div>
     </div>
 
-    <div id="sub-emp" class="panel" style="display:none;">
-      <h2>Data Karyawan Terdaftar</h2>
-      <div id="empTableWrap"></div>
-    </div>
-
-    <div id="sub-hist" class="panel" style="display:none;">
-      <h2>Riwayat Absensi Makan</h2>
-      <div class="stat-row" id="statRow"></div>
-      <div class="filters">
-        <input type="date" id="filterDate">
-        <select id="filterMeal">
-          <option value="">Semua Jenis Makan</option>
-          <option value="Lunch">Lunch</option>
-          <option value="Dinner">Dinner</option>
-          <option value="Supper">Supper</option>
-        </select>
-        <button class="btn" id="clearFilterBtn">Reset</button>
-        <button class="btn" id="refreshBtn">🔄 Muat Ulang</button>
+    <div id="adminContent" style="display:none;">
+      <div class="topbar-admin">
+        <span>Login sebagai: <b id="adminEmailLabel"></b> <span id="adminRoleLabel" class="tag"></span></span>
+        <button id="adminLogoutBtn" class="btn">Logout</button>
       </div>
-      <div id="histTableWrap"></div>
-    </div>
 
-    <div id="sub-settings" class="panel" style="display:none;">
-      <h2>Pengaturan</h2>
-      <div class="form-grid">
-        <label class="small" style="text-align:left;">URL Apps Script (database)</label>
-        <input type="text" id="appsScriptUrl">
-        <button id="saveUrlBtn" class="btn primary">Simpan & Sambungkan Ulang</button>
-        <div id="urlStatus" class="small"></div>
+      <div class="subtabbar">
+        <button class="subtab active" data-sub="add">➕ Tambah Karyawan</button>
+        <button class="subtab" data-sub="emp">📋 Data Karyawan</button>
+        <button class="subtab" data-sub="hist">🕘 Riwayat Absensi</button>
+        <button class="subtab admin-only" data-sub="users">👥 Kelola Akun</button>
+        <button class="subtab admin-only" data-sub="settings">⚙️ Pengaturan</button>
+      </div>
+
+      <div id="sub-add" class="panel">
+        <h2 id="addFormTitle">Tambah Karyawan Baru</h2>
+        <div class="cam-box" style="max-width:300px;margin-bottom:14px;">
+          <video id="adminVideo" autoplay muted playsinline></video>
+          <div class="face-guide"></div>
+          <div class="face-guide-label">Posisikan wajah di dalam oval</div>
+          <div class="scan-ring" id="adminRing"></div>
+        </div>
+        <div class="form-grid">
+          <input type="text" id="empName" placeholder="Nama Karyawan">
+          <input type="text" id="empPos" placeholder="ID / Jabatan (contoh: HK-002, Waiter)">
+          <div class="row"><button id="captureFaceBtn" class="btn">📸 Ambil/Ganti Foto Wajah</button></div>
+          <img id="capturedPreview" class="photo-preview" style="display:none;">
+          <div id="addStatus" class="small"></div>
+          <div class="row">
+            <button id="saveEmpBtn" class="btn primary" disabled>Simpan Karyawan</button>
+            <button id="cancelEditBtn" class="btn" style="display:none;">Batal Edit</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="sub-emp" class="panel" style="display:none;">
+        <div class="panel-header-row">
+          <h2 style="margin:0;">Data Karyawan Terdaftar</h2>
+          <button id="exportEmpBtn" class="btn">📥 Export ke Excel</button>
+        </div>
+        <div id="empTableWrap"></div>
+      </div>
+
+      <div id="sub-hist" class="panel" style="display:none;">
+        <div class="panel-header-row">
+          <h2 style="margin:0;">Riwayat Absensi Makan</h2>
+          <button id="exportHistBtn" class="btn">📥 Export ke Excel</button>
+        </div>
+        <div class="stat-row" id="statRow"></div>
+        <div class="filters">
+          <input type="date" id="filterDate">
+          <select id="filterMeal">
+            <option value="">Semua Jenis Makan</option>
+            <option value="Lunch">Lunch</option>
+            <option value="Dinner">Dinner</option>
+            <option value="Supper">Supper</option>
+          </select>
+          <button class="btn" id="clearFilterBtn">Reset</button>
+          <button class="btn" id="refreshBtn">🔄 Muat Ulang</button>
+        </div>
+        <div id="histTableWrap"></div>
+      </div>
+
+      <div id="sub-users" class="panel" style="display:none;">
+        <h2>Kelola Akun Dashboard</h2>
+        <p class="small" style="margin-bottom:14px;">Akun di sini adalah pengguna yang bisa login ke Dashboard (bukan data karyawan untuk absen makan). Role <b>Admin</b> punya akses penuh, role <b>Staff</b> tidak bisa mengelola akun, menghapus karyawan, atau mengubah Pengaturan.</p>
+        <div class="form-grid" style="margin-bottom:20px;">
+          <input type="text" id="newUserName" placeholder="Nama">
+          <input type="email" id="newUserEmail" placeholder="Email">
+          <input type="password" id="newUserPassword" placeholder="Password">
+          <select id="newUserRole">
+            <option value="staff">Role: Staff</option>
+            <option value="admin">Role: Admin</option>
+          </select>
+          <button id="addUserBtn" class="btn primary">Tambah Akun</button>
+          <div id="addUserStatus" class="small"></div>
+        </div>
+        <div id="usersTableWrap"></div>
+      </div>
+
+      <div id="sub-settings" class="panel" style="display:none;">
+        <h2>Pengaturan</h2>
+        <div class="form-grid">
+          <label class="small" style="text-align:left;">URL Apps Script (database)</label>
+          <input type="text" id="appsScriptUrl">
+          <button id="saveUrlBtn" class="btn primary">Simpan & Sambungkan Ulang</button>
+          <div id="urlStatus" class="small"></div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 (function(){
   const $ = (id)=>document.getElementById(id);
+  let currentUser = null; // {id,name,email,role}
   let faceApiReady = false;
   let employees = [];
   let attendance = [];
   let appsScriptUrl = "";
   let staffStream, adminStream, cameraStarted=false;
   let capturedDescriptor = null, capturedPhoto = null;
+  let editingEmployeeId = null;
 
   // ---------- MEAL TIME ----------
   function getMealType(d){
@@ -215,6 +266,7 @@
     return null;
   }
   function mealTag(m){ if(!m) return ""; return `<span class="tag ${m.toLowerCase()}">${m}</span>`; }
+  function roleTag(r){ return `<span class="tag ${r}">${r==='admin'?'Admin':'Staff'}</span>`; }
   function updateMealBadge(){
     const m = getMealType(new Date());
     const el = $("mealBadge");
@@ -224,21 +276,20 @@
   }
   setInterval(updateMealBadge, 15000);
 
-  // ---------- API (Google Apps Script as DB) ----------
+  // ---------- API ----------
   async function apiGet(action){
     const res = await fetch(`${appsScriptUrl}?action=${action}&t=${Date.now()}`);
     return await res.json();
   }
   async function apiPost(payload){
     const res = await fetch(appsScriptUrl, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(payload)
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(payload)
     });
     return await res.json().catch(()=>({status:'ok'}));
   }
   async function refreshEmployees(){ employees = await apiGet('employees'); renderEmployees(); }
   async function refreshAttendance(){ attendance = await apiGet('attendance'); attendance.sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)); renderHistory(); }
+  async function refreshUsers(){ const users = await apiGet('users'); renderUsers(users); }
 
   // ---------- FACE MODELS ----------
   async function loadModels(){
@@ -338,11 +389,61 @@
     setTimeout(()=>{ ring.className="scan-ring"; btn.disabled=false; status.textContent=""; status.className="status-line"; },2500);
   });
 
-  // ---------- ADMIN ADD EMPLOYEE ----------
+  // ---------- LOGIN (server-verified) ----------
+  $("adminLoginBtn").addEventListener('click', async ()=>{
+    const email = $("adminEmail").value.trim();
+    const pass = $("adminPassword").value;
+    if(!email || !pass){ $("adminLoginStatus").textContent="Isi email dan password."; return; }
+    $("adminLoginBtn").disabled = true; $("adminLoginBtn").textContent = "Memeriksa...";
+    try{
+      const res = await apiPost({action:'login', email, password:pass});
+      if(res.status === 'ok'){
+        currentUser = res.user;
+        localStorage.setItem('astonCurrentUser', JSON.stringify(currentUser));
+        enterDashboard();
+        $("adminPassword").value="";
+      } else {
+        $("adminLoginStatus").textContent = res.message || "Login gagal.";
+        $("adminLoginStatus").className = "small status-line fail";
+      }
+    }catch(err){
+      $("adminLoginStatus").textContent = "Gagal menghubungi server. Cek koneksi/URL.";
+    }
+    $("adminLoginBtn").disabled = false; $("adminLoginBtn").textContent = "Login";
+  });
+  $("adminLogoutBtn").addEventListener('click', ()=>{
+    currentUser = null;
+    localStorage.removeItem('astonCurrentUser');
+    $("adminContent").style.display="none";
+    $("adminLoginGate").style.display="";
+    $("tabStaffBtn").click();
+  });
+  function enterDashboard(){
+    $("adminLoginGate").style.display="none";
+    $("adminContent").style.display="";
+    $("adminEmailLabel").textContent = currentUser.name + " (" + currentUser.email + ")";
+    $("adminRoleLabel").outerHTML = roleTag(currentUser.role).replace('<span','<span id="adminRoleLabel"');
+    applyRolePermissions();
+    if(!adminStream) startCamera($("adminVideo"),'admin');
+  }
+  function applyRolePermissions(){
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    document.querySelectorAll('.admin-only').forEach(el=> el.style.display = isAdmin ? '' : 'none');
+    if(!isAdmin){
+      // if a staff-role user was sitting on an admin-only subtab, bounce back to a safe tab
+      const activeSub = document.querySelector('.subtab.active');
+      if(activeSub && activeSub.classList.contains('admin-only')){
+        document.querySelector('.subtab[data-sub="add"]').click();
+      }
+    }
+    renderEmployees(); // re-render to show/hide delete buttons based on role
+  }
+
+  // ---------- ADMIN: ADD / EDIT EMPLOYEE ----------
   $("captureFaceBtn").addEventListener('click', async ()=>{
     $("addStatus").textContent = "Mendeteksi wajah...";
     const desc = await getDescriptor($("adminVideo"));
-    if(!desc){ $("addStatus").textContent = "Wajah tidak terdeteksi, posisikan wajah di tengah kamera."; return; }
+    if(!desc){ $("addStatus").textContent = "Wajah tidak terdeteksi, posisikan wajah di tengah oval."; return; }
     capturedDescriptor = desc;
     const c = document.createElement('canvas'); c.width=100; c.height=100;
     const ctx = c.getContext('2d'); ctx.translate(100,0); ctx.scale(-1,1);
@@ -354,43 +455,143 @@
   });
   function checkSaveEnable(){ $("saveEmpBtn").disabled = !( $("empName").value.trim() && capturedDescriptor ); }
   $("empName").addEventListener('input', checkSaveEnable);
+
+  function startEditEmployee(emp){
+    editingEmployeeId = emp.id;
+    $("empName").value = emp.name;
+    $("empPos").value = emp.position || '';
+    capturedDescriptor = {vec: emp.descriptor, mode: emp.descMode};
+    capturedPhoto = emp.photo;
+    $("capturedPreview").src = emp.photo || '';
+    $("capturedPreview").style.display = emp.photo ? "block" : "none";
+    $("addFormTitle").textContent = "Edit Karyawan: " + emp.name;
+    $("saveEmpBtn").textContent = "Update Karyawan";
+    $("cancelEditBtn").style.display = "";
+    checkSaveEnable();
+    document.querySelector('.subtab[data-sub="add"]').click();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function resetEmployeeForm(){
+    editingEmployeeId = null;
+    $("empName").value=""; $("empPos").value="";
+    capturedDescriptor=null; capturedPhoto=null;
+    $("capturedPreview").style.display="none";
+    $("addFormTitle").textContent = "Tambah Karyawan Baru";
+    $("saveEmpBtn").textContent = "Simpan Karyawan";
+    $("cancelEditBtn").style.display = "none";
+    $("addStatus").textContent = "";
+  }
+  $("cancelEditBtn").addEventListener('click', resetEmployeeForm);
+
   $("saveEmpBtn").addEventListener('click', async ()=>{
     const name = $("empName").value.trim();
     const pos = $("empPos").value.trim();
     if(!name || !capturedDescriptor) return;
-    const newEmp = {
-      id: Date.now()+"", name, position: pos,
-      descriptor: capturedDescriptor.vec, descMode: capturedDescriptor.mode,
-      photo: capturedPhoto, createdAt: new Date().toISOString()
-    };
-    $("saveEmpBtn").disabled = true; $("saveEmpBtn").textContent = "Menyimpan...";
-    try{
-      await apiPost({action:'addEmployee', ...newEmp});
-      employees.push(newEmp);
-      renderEmployees();
-      $("empName").value=""; $("empPos").value="";
-      capturedDescriptor=null; capturedPhoto=null;
-      $("capturedPreview").style.display="none";
-      $("addStatus").textContent = "Karyawan berhasil disimpan! 🎉";
-    }catch(err){
-      $("addStatus").textContent = "Gagal menyimpan, cek koneksi/URL Apps Script.";
+    $("saveEmpBtn").disabled = true;
+    if(editingEmployeeId){
+      const payload = { action:'updateEmployee', id:editingEmployeeId, name, position:pos, descriptor:capturedDescriptor.vec, descMode:capturedDescriptor.mode, photo:capturedPhoto };
+      $("saveEmpBtn").textContent = "Mengupdate...";
+      try{
+        await apiPost(payload);
+        const idx = employees.findIndex(e=>e.id===editingEmployeeId);
+        if(idx>-1){ employees[idx] = {...employees[idx], name, position:pos, descriptor:capturedDescriptor.vec, descMode:capturedDescriptor.mode, photo:capturedPhoto}; }
+        renderEmployees();
+        $("addStatus").textContent = "Karyawan berhasil diupdate! 🎉";
+        resetEmployeeForm();
+      }catch(err){ $("addStatus").textContent = "Gagal mengupdate, cek koneksi."; $("saveEmpBtn").textContent="Update Karyawan"; }
+    } else {
+      const newEmp = { id: Date.now()+"", name, position: pos, descriptor: capturedDescriptor.vec, descMode: capturedDescriptor.mode, photo: capturedPhoto, createdAt: new Date().toISOString() };
+      $("saveEmpBtn").textContent = "Menyimpan...";
+      try{
+        await apiPost({action:'addEmployee', ...newEmp});
+        employees.push(newEmp);
+        renderEmployees();
+        $("addStatus").textContent = "Karyawan berhasil disimpan! 🎉";
+        resetEmployeeForm();
+      }catch(err){ $("addStatus").textContent = "Gagal menyimpan, cek koneksi/URL Apps Script."; $("saveEmpBtn").textContent="Simpan Karyawan"; }
     }
-    $("saveEmpBtn").textContent = "Simpan Karyawan";
+    $("saveEmpBtn").disabled = false;
   });
 
-  // ---------- RENDER ----------
+  // ---------- USERS (Kelola Akun) ----------
+  $("addUserBtn").addEventListener('click', async ()=>{
+    const name = $("newUserName").value.trim();
+    const email = $("newUserEmail").value.trim();
+    const password = $("newUserPassword").value;
+    const role = $("newUserRole").value;
+    if(!name || !email || !password){ $("addUserStatus").textContent = "Lengkapi semua field."; return; }
+    $("addUserBtn").disabled = true;
+    try{
+      const res = await apiPost({action:'addUser', name, email, password, role});
+      if(res.status==='ok'){
+        $("addUserStatus").textContent = "Akun berhasil ditambahkan ✅";
+        $("newUserName").value=""; $("newUserEmail").value=""; $("newUserPassword").value="";
+        refreshUsers();
+      } else {
+        $("addUserStatus").textContent = res.message || "Gagal menambahkan akun.";
+      }
+    }catch(err){ $("addUserStatus").textContent = "Gagal menghubungi server."; }
+    $("addUserBtn").disabled = false;
+  });
+  function renderUsers(users){
+    const wrap = $("usersTableWrap");
+    if(!users || users.length===0){ wrap.innerHTML = '<div class="empty">Belum ada akun.</div>'; return; }
+    let html = '<table><tr><th>Nama</th><th>Email</th><th>Role</th><th>Dibuat</th><th></th></tr>';
+    for(const u of users){
+      const isSelf = currentUser && u.id===currentUser.id;
+      html += `<tr>
+        <td>${u.name}</td><td>${u.email}</td>
+        <td><select class="role-select" data-roleid="${u.id}" ${isSelf?'disabled':''}>
+              <option value="staff" ${u.role==='staff'?'selected':''}>Staff</option>
+              <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+            </select></td>
+        <td>${new Date(u.createdAt).toLocaleDateString('id-ID')}</td>
+        <td>${isSelf ? '<span class="small">Akun Anda</span>' : `<button class="btn danger" data-deluser="${u.id}">Hapus</button>`}</td>
+      </tr>`;
+    }
+    html += '</table>'; wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-roleid]').forEach(sel=>{
+      sel.addEventListener('change', async ()=>{
+        const id = sel.dataset.roleid; const newRole = sel.value;
+        sel.disabled = true;
+        try{ await apiPost({action:'updateUserRole', id, role:newRole}); }catch(err){}
+        sel.disabled = false;
+      });
+    });
+    wrap.querySelectorAll('[data-deluser]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        if(!confirm('Hapus akun ini? Pengguna tidak akan bisa login lagi.')) return;
+        b.disabled = true; b.textContent="...";
+        try{ await apiPost({action:'deleteUser', id:b.dataset.deluser}); refreshUsers(); }
+        catch(err){ b.disabled=false; b.textContent="Hapus"; }
+      });
+    });
+  }
+
+  // ---------- RENDER EMPLOYEES / HISTORY ----------
   function renderEmployees(){
     const wrap = $("empTableWrap");
+    const isAdmin = currentUser && currentUser.role === 'admin';
     if(employees.length===0){ wrap.innerHTML = '<div class="empty">Belum ada karyawan terdaftar.</div>'; return; }
     let html = '<table><tr><th>Foto</th><th>Nama</th><th>ID/Jabatan</th><th>Terdaftar</th><th></th></tr>';
     for(const e of employees){
       html += `<tr><td><img class="avatar" src="${e.photo||''}"></td><td>${e.name}</td><td>${e.position||'-'}</td>
         <td>${new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
-        <td><button class="btn danger" data-del="${e.id}">Hapus</button></td></tr>`;
+        <td>
+          <button class="btn" data-edit="${e.id}">Edit</button>
+          ${isAdmin ? `<button class="btn danger" data-del="${e.id}">Hapus</button>` : ''}
+        </td></tr>`;
     }
     html += '</table>'; wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-edit]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const emp = employees.find(e=>e.id===b.dataset.edit);
+        if(emp) startEditEmployee(emp);
+      });
+    });
     wrap.querySelectorAll('[data-del]').forEach(b=>{
       b.addEventListener('click', async ()=>{
+        if(!confirm('Hapus karyawan ini? Tindakan ini tidak dapat dibatalkan.')) return;
         b.disabled = true; b.textContent="...";
         try{
           await apiPost({action:'deleteEmployee', id:b.dataset.del});
@@ -431,13 +632,33 @@
   $("clearFilterBtn").addEventListener('click', ()=>{ $("filterDate").value=""; $("filterMeal").value=""; renderHistory(); });
   $("refreshBtn").addEventListener('click', refreshAttendance);
 
-  // ---------- SETTINGS ----------
-  $("saveUrlBtn").addEventListener('click', async ()=>{
-    appsScriptUrl = $("appsScriptUrl").value.trim();
-    localStorage.setItem('astonAppsScriptUrl', appsScriptUrl);
-    $("urlStatus").textContent = "Menyambungkan ulang...";
-    try{ await refreshEmployees(); await refreshAttendance(); $("urlStatus").textContent="Tersambung ✅"; }
-    catch(err){ $("urlStatus").textContent="Gagal terhubung, periksa URL."; }
+  // ---------- EXPORT TO EXCEL ----------
+  $("exportEmpBtn").addEventListener('click', ()=>{
+    if(employees.length===0){ alert('Belum ada data karyawan untuk diexport.'); return; }
+    const data = employees.map(e=>({ Nama: e.name, "ID/Jabatan": e.position || '-', "Tanggal Daftar": new Date(e.createdAt).toLocaleString('id-ID') }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Karyawan");
+    XLSX.writeFile(wb, `Data_Karyawan_Aston_${new Date().toISOString().slice(0,10)}.xlsx`);
+  });
+  $("exportHistBtn").addEventListener('click', ()=>{
+    const dateFilter = $("filterDate").value;
+    const mealFilter = $("filterMeal").value;
+    let filtered = attendance.filter(r=>{
+      const d = new Date(r.timestamp); const dStr = d.toISOString().slice(0,10);
+      if(dateFilter && dStr!==dateFilter) return false;
+      if(mealFilter && r.meal!==mealFilter) return false;
+      return true;
+    });
+    if(filtered.length===0){ alert('Tidak ada data absensi untuk diexport (sesuai filter saat ini).'); return; }
+    const data = filtered.map(r=>{
+      const d = new Date(r.timestamp);
+      return { Nama: r.name, "ID/Jabatan": r.position || '-', "Jenis Makan": r.meal, Tanggal: d.toLocaleDateString('id-ID'), Waktu: d.toLocaleTimeString('id-ID') };
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Riwayat Absensi");
+    XLSX.writeFile(wb, `Riwayat_Absensi_Aston_${new Date().toISOString().slice(0,10)}.xlsx`);
   });
 
   // ---------- TABS ----------
@@ -448,15 +669,16 @@
   $("tabAdminBtn").addEventListener('click', ()=>{
     $("tabAdminBtn").classList.add('active'); $("tabStaffBtn").classList.remove('active');
     $("adminView").style.display=""; $("staffView").style.display="none";
-    if(!adminStream) startCamera($("adminVideo"),'admin');
+    if(currentUser){ enterDashboard(); } else { $("adminLoginGate").style.display=""; $("adminContent").style.display="none"; }
   });
   document.querySelectorAll('.subtab').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       document.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      ['add','emp','hist','settings'].forEach(s=>{ $("sub-"+s).style.display = (s===btn.dataset.sub) ? "" : "none"; });
+      ['add','emp','hist','users','settings'].forEach(s=>{ $("sub-"+s).style.display = (s===btn.dataset.sub) ? "" : "none"; });
       if(btn.dataset.sub==='hist') refreshAttendance();
       if(btn.dataset.sub==='emp') refreshEmployees();
+      if(btn.dataset.sub==='users') refreshUsers();
     });
   });
 
@@ -477,6 +699,13 @@
       $("gateStatus").textContent = "Gagal terhubung. Periksa URL & pastikan deploy 'Anyone' access.";
     }
   });
+  $("saveUrlBtn").addEventListener('click', async ()=>{
+    appsScriptUrl = $("appsScriptUrl").value.trim();
+    localStorage.setItem('astonAppsScriptUrl', appsScriptUrl);
+    $("urlStatus").textContent = "Menyambungkan ulang...";
+    try{ await refreshEmployees(); await refreshAttendance(); $("urlStatus").textContent="Tersambung ✅"; }
+    catch(err){ $("urlStatus").textContent="Gagal terhubung, periksa URL."; }
+  });
 
   async function boot(){
     await loadModels();
@@ -484,6 +713,8 @@
     updateMealBadge();
     await refreshEmployees();
     await refreshAttendance();
+    const savedUser = localStorage.getItem('astonCurrentUser');
+    if(savedUser){ try{ currentUser = JSON.parse(savedUser); }catch(e){} }
   }
 
   (function init(){

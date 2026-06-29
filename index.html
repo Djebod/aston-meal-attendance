@@ -260,6 +260,9 @@
 <script>
 (function(){
   const $ = (id)=>document.getElementById(id);
+  // Tempel URL Apps Script Anda di sini (diakhiri /exec) agar semua device otomatis tersambung
+  // tanpa perlu input manual. Biarkan "" jika ingin tetap pakai layar Setup Awal manual.
+  const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx4LjFvK9ECtwZQGeVe5TVqs4WDGFtEcsIA926XRXcA5mtEB2Xnt1hkaMu4FdHtmsKVhg/exec";
   const SUPER_ADMIN_EMAILS = ['syam.rakhmany@gmail.com','itm@astoncirebon.com'];
   let currentUser = null; // {id,name,email,role}
   let faceApiReady = false;
@@ -754,7 +757,7 @@
   }
 
   (function init(){
-    const saved = localStorage.getItem('astonAppsScriptUrl');
+    const saved = localStorage.getItem('astonAppsScriptUrl') || DEFAULT_APPS_SCRIPT_URL;
     if(saved){
       appsScriptUrl = saved;
       $("appsScriptUrl").value = saved;

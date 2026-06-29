@@ -414,6 +414,17 @@
     }
     const match = findMatch(desc);
     if(match){
+      // refresh attendance dari server dulu agar pengecekan duplikat akurat lintas device
+      try{ await refreshAttendance(); }catch(err){}
+      const todayStr = new Date().toDateString();
+      const alreadyDone = attendance.some(r=> r.employeeId===match.id && r.meal===meal && new Date(r.timestamp).toDateString()===todayStr);
+      if(alreadyDone){
+        ring.className="scan-ring fail";
+        status.textContent = `⚠️ ${match.name} sudah absen ${meal} hari ini.`;
+        status.className="status-line fail";
+        setTimeout(()=>{ ring.className="scan-ring"; btn.disabled=false; status.textContent=""; status.className="status-line"; },2500);
+        return;
+      }
       ring.className="scan-ring ok";
       status.textContent = `✅ ${match.name} — ${meal} tercatat!`;
       status.className="status-line ok";

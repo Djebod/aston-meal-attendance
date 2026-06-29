@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Absensi Makan - Aston Cirebon</title>
+<style>
+  :root{
+    --bg:#0f1419;--panel:rgba(255,255,255,0.05);--panel-border:rgba(255,255,255,0.1);
+    --accent:#00c2a8;--accent2:#6c5ce7;--text:#eaf2f0;--muted:#9aa6a3;
+    --danger:#ff5b5b;--success:#2ecc71;--radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:radial-gradient(circle at 20% 20%, #16202b 0%, #0f1419 60%);color:var(--text);min-height:100vh;}
+  .wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px;}
+  header{text-align:center;padding:24px 10px 10px;}
+  header h1{font-size:1.5rem;margin:0 0 4px;background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;}
+  header p{color:var(--muted);margin:0;font-size:.85rem;}
+  .tabbar{display:flex;gap:8px;justify-content:center;margin:20px 0;flex-wrap:wrap;}
+  .tabbar button{padding:10px 22px;border-radius:999px;border:1px solid var(--panel-border);background:var(--panel);
+    color:var(--text);cursor:pointer;font-weight:600;font-size:.9rem;transition:.2s;}
+  .tabbar button.active{background:linear-gradient(90deg,var(--accent),var(--accent2));border-color:transparent;color:#06120f;}
+  .tabbar button:hover{transform:translateY(-1px);}
+  .panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:var(--radius);
+    padding:22px;margin-bottom:18px;backdrop-filter:blur(8px);}
+  .panel h2{margin:0 0 14px;font-size:1.05rem;}
+  .cam-box{position:relative;width:100%;max-width:380px;margin:0 auto;aspect-ratio:4/3;background:#000;
+    border-radius:var(--radius);overflow:hidden;border:2px solid var(--panel-border);}
+  video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+  .scan-ring{position:absolute;inset:0;border-radius:var(--radius);pointer-events:none;
+    box-shadow: inset 0 0 0 3px transparent;transition:.3s;}
+  .scan-ring.scanning{box-shadow: inset 0 0 0 3px var(--accent2); animation:pulse 1s infinite;}
+  .scan-ring.ok{box-shadow: inset 0 0 0 4px var(--success);}
+  .scan-ring.fail{box-shadow: inset 0 0 0 4px var(--danger);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .meal-badge{display:inline-block;margin:14px auto 6px;padding:6px 16px;border-radius:999px;font-weight:700;
+    font-size:.85rem;background:rgba(0,194,168,.15);color:var(--accent);border:1px solid rgba(0,194,168,.4);}
+  .meal-badge.off{background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--panel-border);}
+  .big-btn{display:block;margin:18px auto 4px;padding:16px 38px;border:none;border-radius:999px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));color:#06120f;font-weight:800;font-size:1.05rem;cursor:pointer;transition:.2s;}
+  .big-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .big-btn:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,194,168,.3);}
+  .status-line{text-align:center;min-height:24px;margin-top:8px;font-size:.9rem;color:var(--muted);}
+  .status-line.ok{color:var(--success);font-weight:700;}
+  .status-line.fail{color:var(--danger);font-weight:700;}
+  .center{text-align:center;}
+  .form-grid{display:grid;gap:10px;max-width:420px;margin:0 auto;}
+  input[type=text]{padding:11px 14px;border-radius:10px;border:1px solid var(--panel-border);
+    background:rgba(255,255,255,.04);color:var(--text);font-size:.9rem;}
+  input::placeholder{color:var(--muted);}
+  .btn{padding:10px 18px;border-radius:10px;border:1px solid var(--panel-border);background:rgba(255,255,255,.06);
+    color:var(--text);cursor:pointer;font-weight:600;font-size:.85rem;}
+  .btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#06120f;border:none;}
+  .btn.danger{background:rgba(255,91,91,.15);color:var(--danger);border:1px solid rgba(255,91,91,.4);}
+  .btn:hover{filter:brightness(1.1);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .subtabbar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .subtabbar button{padding:7px 14px;font-size:.8rem;border-radius:8px;border:1px solid var(--panel-border);
+    background:transparent;color:var(--muted);cursor:pointer;}
+  .subtabbar button.active{background:rgba(255,255,255,.08);color:var(--text);}
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--panel-border);}
+  th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;}
+  tr:hover td{background:rgba(255,255,255,.03);}
+  .avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#222;}
+  .empty{color:var(--muted);text-align:center;padding:24px;font-size:.85rem;}
+  .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+  select,input[type=date]{padding:8px 10px;border-radius:8px;border:1px solid var(--panel-border);
+    background:rgba(255,255,255,.04);color:var(--text);font-size:.82rem;}
+  .stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .stat{flex:1;min-width:90px;background:rgba(255,255,255,.04);border:1px solid var(--panel-border);
+    border-radius:12px;padding:12px;text-align:center;}
+  .stat .num{font-size:1.4rem;font-weight:800;color:var(--accent);}
+  .stat .lbl{font-size:.72rem;color:var(--muted);}
+  .banner{background:rgba(255,193,7,.1);border:1px solid rgba(255,193,7,.35);color:#ffd76b;
+    padding:10px 14px;border-radius:10px;font-size:.78rem;margin-bottom:14px;line-height:1.4;}
+  .banner.ok{background:rgba(46,204,113,.1);border-color:rgba(46,204,113,.35);color:#7ee8a8;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.7rem;font-weight:700;}
+  .tag.lunch{background:rgba(255,193,7,.15);color:#ffc107;}
+  .tag.dinner{background:rgba(108,92,231,.18);color:#a18bff;}
+  .tag.supper{background:rgba(0,194,168,.15);color:var(--accent);}
+  .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .small{font-size:.75rem;color:var(--muted);text-align:center;margin-top:6px;}
+  .photo-preview{width:90px;height:90px;border-radius:50%;object-fit:cover;display:block;margin:10px auto;border:2px solid var(--panel-border);}
+  #gate{position:fixed;inset:0;background:#0b0f12;display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;}
+  #gate .box{max-width:420px;width:100%;}
+  .spinner{width:34px;height:34px;border:3px solid var(--panel-border);border-top-color:var(--accent);
+    border-radius:50%;animation:spin 1s linear infinite;margin:14px auto;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="box panel">
+    <h2 class="center">🔧 Setup Awal</h2>
+    <p class="small">Tempel URL Web App Google Apps Script Anda (dipakai sebagai database absensi & data karyawan).</p>
+    <div class="form-grid">
+      <input type="text" id="gateUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <button id="gateSaveBtn" class="btn primary">Simpan & Mulai</button>
+      <div id="gateStatus" class="small"></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="appRoot" style="display:none;">
+  <header>
+    <h1>🍽️ Absensi Makan Karyawan</h1>
+    <p>Aston Cirebon — Face Recognition Check-in</p>
+  </header>
+
+  <div class="tabbar">
+    <button id="tabStaffBtn" class="active">👤 Staff</button>
+    <button id="tabAdminBtn">🛠️ Admin</button>
+  </div>
+
+  <div id="staffView">
+    <div class="panel center">
+      <div id="modelBanner"></div>
+      <div class="cam-box">
+        <video id="staffVideo" autoplay muted playsinline></video>
+        <div class="scan-ring" id="staffRing"></div>
+      </div>
+      <div id="mealBadge" class="meal-badge off">Memuat jam...</div><br>
+      <button id="absenBtn" class="big-btn" disabled>Memuat kamera...</button>
+      <div id="staffStatus" class="status-line"></div>
+    </div>
+  </div>
+
+  <div id="adminView" style="display:none;">
+    <div class="subtabbar">
+      <button class="subtab active" data-sub="add">➕ Tambah Karyawan</button>
+      <button class="subtab" data-sub="emp">📋 Data Karyawan</button>
+      <button class="subtab" data-sub="hist">🕘 Riwayat Absensi</button>
+      <button class="subtab" data-sub="settings">⚙️ Pengaturan</button>
+    </div>
+
+    <div id="sub-add" class="panel">
+      <h2>Tambah Karyawan Baru</h2>
+      <div class="cam-box" style="max-width:300px;margin-bottom:14px;">
+        <video id="adminVideo" autoplay muted playsinline></video>
+        <div class="scan-ring" id="adminRing"></div>
+      </div>
+      <div class="form-grid">
+        <input type="text" id="empName" placeholder="Nama Karyawan">
+        <input type="text" id="empPos" placeholder="ID / Jabatan (contoh: HK-002, Waiter)">
+        <div class="row"><button id="captureFaceBtn" class="btn">📸 Ambil Foto Wajah</button></div>
+        <img id="capturedPreview" class="photo-preview" style="display:none;">
+        <div id="addStatus" class="small"></div>
+        <button id="saveEmpBtn" class="btn primary" disabled>Simpan Karyawan</button>
+      </div>
+    </div>
+
+    <div id="sub-emp" class="panel" style="display:none;">
+      <h2>Data Karyawan Terdaftar</h2>
+      <div id="empTableWrap"></div>
+    </div>
+
+    <div id="sub-hist" class="panel" style="display:none;">
+      <h2>Riwayat Absensi Makan</h2>
+      <div class="stat-row" id="statRow"></div>
+      <div class="filters">
+        <input type="date" id="filterDate">
+        <select id="filterMeal">
+          <option value="">Semua Jenis Makan</option>
+          <option value="Lunch">Lunch</option>
+          <option value="Dinner">Dinner</option>
+          <option value="Supper">Supper</option>
+        </select>
+        <button class="btn" id="clearFilterBtn">Reset</button>
+        <button class="btn" id="refreshBtn">🔄 Muat Ulang</button>
+      </div>
+      <div id="histTableWrap"></div>
+    </div>
+
+    <div id="sub-settings" class="panel" style="display:none;">
+      <h2>Pengaturan</h2>
+      <div class="form-grid">
+        <label class="small" style="text-align:left;">URL Apps Script (database)</label>
+        <input type="text" id="appsScriptUrl">
+        <button id="saveUrlBtn" class="btn primary">Simpan & Sambungkan Ulang</button>
+        <div id="urlStatus" class="small"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  let faceApiReady = false;
+  let employees = [];
+  let attendance = [];
+  let appsScriptUrl = "";
+  let staffStream, adminStream, cameraStarted=false;
+  let capturedDescriptor = null, capturedPhoto = null;
+
+  // ---------- MEAL TIME ----------
+  function getMealType(d){
+    const h = d.getHours() + d.getMinutes()/60;
+    if (h>=11 && h<15) return "Lunch";
+    if (h>=17 && h<21) return "Dinner";
+    if (h>=23 || h<2) return "Supper";
+    return null;
+  }
+  function mealTag(m){ if(!m) return ""; return `<span class="tag ${m.toLowerCase()}">${m}</span>`; }
+  function updateMealBadge(){
+    const m = getMealType(new Date());
+    const el = $("mealBadge");
+    if(m){ el.textContent = "Jam makan aktif: "+m; el.className="meal-badge"; }
+    else { el.textContent = "Di luar jam makan"; el.className="meal-badge off"; }
+    $("absenBtn").disabled = !m || !cameraStarted;
+  }
+  setInterval(updateMealBadge, 15000);
+
+  // ---------- API (Google Apps Script as DB) ----------
+  async function apiGet(action){
+    const res = await fetch(`${appsScriptUrl}?action=${action}&t=${Date.now()}`);
+    return await res.json();
+  }
+  async function apiPost(payload){
+    const res = await fetch(appsScriptUrl, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    });
+    return await res.json().catch(()=>({status:'ok'}));
+  }
+  async function refreshEmployees(){ employees = await apiGet('employees'); renderEmployees(); }
+  async function refreshAttendance(){ attendance = await apiGet('attendance'); attendance.sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)); renderHistory(); }
+
+  // ---------- FACE MODELS ----------
+  async function loadModels(){
+    const base = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights";
+    try{
+      await faceapi.nets.tinyFaceDetector.loadFromUri(base);
+      await faceapi.nets.faceLandmark68Net.loadFromUri(base);
+      await faceapi.nets.faceRecognitionNet.loadFromUri(base);
+      faceApiReady = true;
+      $("modelBanner").innerHTML = `<div class="banner ok">✅ Model AI pengenalan wajah aktif penuh.</div>`;
+    }catch(err){
+      $("modelBanner").innerHTML = `<div class="banner">⚠️ Gagal memuat model AI (cek koneksi internet). Sistem memakai mode pencocokan dasar (demo).</div>`;
+    }
+  }
+
+  // ---------- DESCRIPTOR ----------
+  async function getDescriptor(videoEl){
+    if(faceApiReady){
+      const det = await faceapi.detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks().withFaceDescriptor();
+      if(!det) return null;
+      return {vec:Array.from(det.descriptor), mode:'ai'};
+    }
+    const c = document.createElement('canvas'); c.width=24; c.height=24;
+    const ctx = c.getContext('2d');
+    ctx.save(); ctx.translate(24,0); ctx.scale(-1,1);
+    ctx.drawImage(videoEl,0,0,24,24); ctx.restore();
+    const data = ctx.getImageData(0,0,24,24).data;
+    const vec = [];
+    for(let i=0;i<data.length;i+=4){ vec.push((data[i]+data[i+1]+data[i+2])/3/255); }
+    return {vec, mode:'basic'};
+  }
+  function dist(a,b){ let s=0; for(let i=0;i<a.length;i++){ s += (a[i]-b[i])**2; } return Math.sqrt(s); }
+  function findMatch(desc){
+    if(employees.length===0) return null;
+    let best=null, bestD=Infinity;
+    for(const emp of employees){
+      if(!emp.descriptor || emp.descMode!==desc.mode) continue;
+      const d = dist(desc.vec, emp.descriptor);
+      if(d<bestD){ bestD=d; best=emp; }
+    }
+    const threshold = desc.mode==='ai' ? 0.55 : 0.18;
+    if(best && bestD<threshold) return best;
+    return null;
+  }
+
+  // ---------- CAMERA ----------
+  async function startCamera(videoEl, which){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
+      videoEl.srcObject = stream;
+      if(which==='staff'){ staffStream=stream; cameraStarted=true; updateMealBadge(); $("absenBtn").textContent="Absen Makan"; }
+      if(which==='admin'){ adminStream=stream; }
+    }catch(err){
+      if(which==='staff'){
+        $("staffStatus").textContent = "Tidak dapat mengakses kamera. Izinkan akses kamera di browser (perlu HTTPS).";
+        $("staffStatus").className="status-line fail";
+      }
+    }
+  }
+
+  // ---------- STAFF ABSEN ----------
+  $("absenBtn").addEventListener('click', async ()=>{
+    const meal = getMealType(new Date());
+    if(!meal) return;
+    const btn = $("absenBtn"); const ring = $("staffRing"); const status = $("staffStatus");
+    btn.disabled = true; ring.className="scan-ring scanning";
+    status.textContent = "Mendeteksi wajah..."; status.className="status-line";
+    await new Promise(r=>setTimeout(r,500));
+    const desc = await getDescriptor($("staffVideo"));
+    if(!desc){
+      ring.className="scan-ring fail"; status.textContent="Wajah tidak terdeteksi, coba lagi.";
+      status.className="status-line fail"; btn.disabled=false;
+      setTimeout(()=>ring.className="scan-ring",1500);
+      return;
+    }
+    const match = findMatch(desc);
+    if(match){
+      ring.className="scan-ring ok";
+      status.textContent = `✅ ${match.name} — ${meal} tercatat!`;
+      status.className="status-line ok";
+      const record = {id:Date.now()+"", employeeId:match.id, name:match.name, position:match.position, meal, timestamp:new Date().toISOString()};
+      attendance.unshift(record);
+      renderHistory();
+      apiPost({action:'addAttendance', ...record}).catch(()=>{});
+    } else {
+      ring.className="scan-ring fail";
+      status.textContent = "❌ Wajah tidak dikenali / belum terdaftar.";
+      status.className="status-line fail";
+    }
+    setTimeout(()=>{ ring.className="scan-ring"; btn.disabled=false; status.textContent=""; status.className="status-line"; },2500);
+  });
+
+  // ---------- ADMIN ADD EMPLOYEE ----------
+  $("captureFaceBtn").addEventListener('click', async ()=>{
+    $("addStatus").textContent = "Mendeteksi wajah...";
+    const desc = await getDescriptor($("adminVideo"));
+    if(!desc){ $("addStatus").textContent = "Wajah tidak terdeteksi, posisikan wajah di tengah kamera."; return; }
+    capturedDescriptor = desc;
+    const c = document.createElement('canvas'); c.width=100; c.height=100;
+    const ctx = c.getContext('2d'); ctx.translate(100,0); ctx.scale(-1,1);
+    ctx.drawImage($("adminVideo"),0,0,100,100);
+    capturedPhoto = c.toDataURL('image/jpeg',0.7);
+    $("capturedPreview").src = capturedPhoto; $("capturedPreview").style.display = "block";
+    $("addStatus").textContent = "Foto wajah berhasil diambil ✅";
+    checkSaveEnable();
+  });
+  function checkSaveEnable(){ $("saveEmpBtn").disabled = !( $("empName").value.trim() && capturedDescriptor ); }
+  $("empName").addEventListener('input', checkSaveEnable);
+  $("saveEmpBtn").addEventListener('click', async ()=>{
+    const name = $("empName").value.trim();
+    const pos = $("empPos").value.trim();
+    if(!name || !capturedDescriptor) return;
+    const newEmp = {
+      id: Date.now()+"", name, position: pos,
+      descriptor: capturedDescriptor.vec, descMode: capturedDescriptor.mode,
+      photo: capturedPhoto, createdAt: new Date().toISOString()
+    };
+    $("saveEmpBtn").disabled = true; $("saveEmpBtn").textContent = "Menyimpan...";
+    try{
+      await apiPost({action:'addEmployee', ...newEmp});
+      employees.push(newEmp);
+      renderEmployees();
+      $("empName").value=""; $("empPos").value="";
+      capturedDescriptor=null; capturedPhoto=null;
+      $("capturedPreview").style.display="none";
+      $("addStatus").textContent = "Karyawan berhasil disimpan! 🎉";
+    }catch(err){
+      $("addStatus").textContent = "Gagal menyimpan, cek koneksi/URL Apps Script.";
+    }
+    $("saveEmpBtn").textContent = "Simpan Karyawan";
+  });
+
+  // ---------- RENDER ----------
+  function renderEmployees(){
+    const wrap = $("empTableWrap");
+    if(employees.length===0){ wrap.innerHTML = '<div class="empty">Belum ada karyawan terdaftar.</div>'; return; }
+    let html = '<table><tr><th>Foto</th><th>Nama</th><th>ID/Jabatan</th><th>Terdaftar</th><th></th></tr>';
+    for(const e of employees){
+      html += `<tr><td><img class="avatar" src="${e.photo||''}"></td><td>${e.name}</td><td>${e.position||'-'}</td>
+        <td>${new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
+        <td><button class="btn danger" data-del="${e.id}">Hapus</button></td></tr>`;
+    }
+    html += '</table>'; wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-del]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        b.disabled = true; b.textContent="...";
+        try{
+          await apiPost({action:'deleteEmployee', id:b.dataset.del});
+          employees = employees.filter(e=>e.id!==b.dataset.del);
+          renderEmployees();
+        }catch(err){ b.disabled=false; b.textContent="Hapus"; }
+      });
+    });
+  }
+  function renderHistory(){
+    const dateFilter = $("filterDate").value;
+    const mealFilter = $("filterMeal").value;
+    let filtered = attendance.filter(r=>{
+      const d = new Date(r.timestamp); const dStr = d.toISOString().slice(0,10);
+      if(dateFilter && dStr!==dateFilter) return false;
+      if(mealFilter && r.meal!==mealFilter) return false;
+      return true;
+    });
+    const counts = {Lunch:0,Dinner:0,Supper:0};
+    filtered.forEach(r=>{ if(counts[r.meal]!==undefined) counts[r.meal]++; });
+    $("statRow").innerHTML = `
+      <div class="stat"><div class="num">${filtered.length}</div><div class="lbl">Total</div></div>
+      <div class="stat"><div class="num">${counts.Lunch}</div><div class="lbl">Lunch</div></div>
+      <div class="stat"><div class="num">${counts.Dinner}</div><div class="lbl">Dinner</div></div>
+      <div class="stat"><div class="num">${counts.Supper}</div><div class="lbl">Supper</div></div>`;
+    const wrap = $("histTableWrap");
+    if(filtered.length===0){ wrap.innerHTML = '<div class="empty">Belum ada data absensi.</div>'; return; }
+    let html = '<table><tr><th>Nama</th><th>ID/Jabatan</th><th>Jenis</th><th>Tanggal</th><th>Waktu</th></tr>';
+    for(const r of filtered){
+      const d = new Date(r.timestamp);
+      html += `<tr><td>${r.name}</td><td>${r.position||'-'}</td><td>${mealTag(r.meal)}</td>
+        <td>${d.toLocaleDateString('id-ID')}</td><td>${d.toLocaleTimeString('id-ID')}</td></tr>`;
+    }
+    html += '</table>'; wrap.innerHTML = html;
+  }
+  $("filterDate").addEventListener('change', renderHistory);
+  $("filterMeal").addEventListener('change', renderHistory);
+  $("clearFilterBtn").addEventListener('click', ()=>{ $("filterDate").value=""; $("filterMeal").value=""; renderHistory(); });
+  $("refreshBtn").addEventListener('click', refreshAttendance);
+
+  // ---------- SETTINGS ----------
+  $("saveUrlBtn").addEventListener('click', async ()=>{
+    appsScriptUrl = $("appsScriptUrl").value.trim();
+    localStorage.setItem('astonAppsScriptUrl', appsScriptUrl);
+    $("urlStatus").textContent = "Menyambungkan ulang...";
+    try{ await refreshEmployees(); await refreshAttendance(); $("urlStatus").textContent="Tersambung ✅"; }
+    catch(err){ $("urlStatus").textContent="Gagal terhubung, periksa URL."; }
+  });
+
+  // ---------- TABS ----------
+  $("tabStaffBtn").addEventListener('click', ()=>{
+    $("tabStaffBtn").classList.add('active'); $("tabAdminBtn").classList.remove('active');
+    $("staffView").style.display=""; $("adminView").style.display="none";
+  });
+  $("tabAdminBtn").addEventListener('click', ()=>{
+    $("tabAdminBtn").classList.add('active'); $("tabStaffBtn").classList.remove('active');
+    $("adminView").style.display=""; $("staffView").style.display="none";
+    if(!adminStream) startCamera($("adminVideo"),'admin');
+  });
+  document.querySelectorAll('.subtab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      ['add','emp','hist','settings'].forEach(s=>{ $("sub-"+s).style.display = (s===btn.dataset.sub) ? "" : "none"; });
+      if(btn.dataset.sub==='hist') refreshAttendance();
+      if(btn.dataset.sub==='emp') refreshEmployees();
+    });
+  });
+
+  // ---------- GATE / INIT ----------
+  $("gateSaveBtn").addEventListener('click', async ()=>{
+    const url = $("gateUrl").value.trim();
+    if(!url){ $("gateStatus").textContent="URL tidak boleh kosong."; return; }
+    $("gateStatus").textContent = "Menghubungkan...";
+    appsScriptUrl = url;
+    try{
+      await apiGet('employees');
+      localStorage.setItem('astonAppsScriptUrl', url);
+      $("gate").style.display="none";
+      $("appRoot").style.display="";
+      $("appsScriptUrl").value = url;
+      boot();
+    }catch(err){
+      $("gateStatus").textContent = "Gagal terhubung. Periksa URL & pastikan deploy 'Anyone' access.";
+    }
+  });
+
+  async function boot(){
+    await loadModels();
+    startCamera($("staffVideo"),'staff');
+    updateMealBadge();
+    await refreshEmployees();
+    await refreshAttendance();
+  }
+
+  (function init(){
+    const saved = localStorage.getItem('astonAppsScriptUrl');
+    if(saved){
+      appsScriptUrl = saved;
+      $("appsScriptUrl").value = saved;
+      $("gate").style.display="none";
+      $("appRoot").style.display="";
+      boot();
+    } else {
+      $("gate").style.display="flex";
+    }
+  })();
+})();
+</script>
+</body>
+</html>

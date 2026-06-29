@@ -162,7 +162,7 @@
         <button class="subtab" data-sub="hist">🕘 Riwayat Absensi</button>
         <button class="subtab" data-sub="pass">🔑 Ubah Password</button>
         <button class="subtab admin-only" data-sub="users">👥 Kelola Akun</button>
-        <button class="subtab admin-only" data-sub="settings">⚙️ Pengaturan</button>
+        <button class="subtab super-admin-only" data-sub="settings">⚙️ Pengaturan</button>
       </div>
 
       <div id="sub-add" class="panel">
@@ -260,6 +260,7 @@
 <script>
 (function(){
   const $ = (id)=>document.getElementById(id);
+  const SUPER_ADMIN_EMAILS = ['syam.rakhmany@gmail.com','itm@astoncirebon.com'];
   let currentUser = null; // {id,name,email,role}
   let faceApiReady = false;
   let employees = [];
@@ -440,13 +441,12 @@
   }
   function applyRolePermissions(){
     const isAdmin = currentUser && currentUser.role === 'admin';
+    const isSuperAdmin = currentUser && SUPER_ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
     document.querySelectorAll('.admin-only').forEach(el=> el.style.display = isAdmin ? '' : 'none');
-    if(!isAdmin){
-      // if a staff-role user was sitting on an admin-only subtab, bounce back to a safe tab
-      const activeSub = document.querySelector('.subtab.active');
-      if(activeSub && activeSub.classList.contains('admin-only')){
-        document.querySelector('.subtab[data-sub="add"]').click();
-      }
+    document.querySelectorAll('.super-admin-only').forEach(el=> el.style.display = isSuperAdmin ? '' : 'none');
+    const activeSub = document.querySelector('.subtab.active');
+    if(activeSub && ((activeSub.classList.contains('admin-only') && !isAdmin) || (activeSub.classList.contains('super-admin-only') && !isSuperAdmin))){
+      document.querySelector('.subtab[data-sub="add"]').click();
     }
     renderEmployees(); // re-render to show/hide delete buttons based on role
   }

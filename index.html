@@ -176,6 +176,18 @@
         <div class="form-grid">
           <input type="text" id="empName" placeholder="Nama Karyawan">
           <input type="text" id="empPos" placeholder="ID / Jabatan (contoh: HK-002, Waiter)">
+          <select id="empDept">
+            <option value="">Pilih Departemen</option>
+            <option value="A&G">A&G</option>
+            <option value="ACCOUNTING">ACCOUNTING</option>
+            <option value="ENGINEERING">ENGINEERING</option>
+            <option value="FRONT OFFICE">FRONT OFFICE</option>
+            <option value="F&B SERVICES">F&B SERVICES</option>
+            <option value="F&B PRODUCT">F&B PRODUCT</option>
+            <option value="HOUSEKEEPING">HOUSEKEEPING</option>
+            <option value="HUMAN RESOURCES">HUMAN RESOURCES</option>
+            <option value="SALES MARKETING">SALES MARKETING</option>
+          </select>
           <div class="row"><button id="captureFaceBtn" class="btn">📸 Ambil/Ganti Foto Wajah</button></div>
           <img id="capturedPreview" class="photo-preview" style="display:none;">
           <div id="addStatus" class="small"></div>
@@ -207,6 +219,18 @@
             <option value="Lunch">Lunch</option>
             <option value="Dinner">Dinner</option>
             <option value="Supper">Supper</option>
+          </select>
+          <select id="filterDept">
+            <option value="">Semua Departemen</option>
+            <option value="A&G">A&G</option>
+            <option value="ACCOUNTING">ACCOUNTING</option>
+            <option value="ENGINEERING">ENGINEERING</option>
+            <option value="FRONT OFFICE">FRONT OFFICE</option>
+            <option value="F&B SERVICES">F&B SERVICES</option>
+            <option value="F&B PRODUCT">F&B PRODUCT</option>
+            <option value="HOUSEKEEPING">HOUSEKEEPING</option>
+            <option value="HUMAN RESOURCES">HUMAN RESOURCES</option>
+            <option value="SALES MARKETING">SALES MARKETING</option>
           </select>
           <button class="btn" id="clearFilterBtn">Reset</button>
           <button class="btn" id="refreshBtn">🔄 Muat Ulang</button>
@@ -393,7 +417,7 @@
       ring.className="scan-ring ok";
       status.textContent = `✅ ${match.name} — ${meal} tercatat!`;
       status.className="status-line ok";
-      const record = {id:Date.now()+"", employeeId:match.id, name:match.name, position:match.position, meal, timestamp:new Date().toISOString()};
+      const record = {id:Date.now()+"", employeeId:match.id, name:match.name, position:match.position, department:match.department||'', meal, timestamp:new Date().toISOString()};
       attendance.unshift(record);
       renderHistory();
       apiPost({action:'addAttendance', ...record}).catch(()=>{});
@@ -475,6 +499,7 @@
     editingEmployeeId = emp.id;
     $("empName").value = emp.name;
     $("empPos").value = emp.position || '';
+    $("empDept").value = emp.department || '';
     capturedDescriptor = {vec: emp.descriptor, mode: emp.descMode};
     capturedPhoto = emp.photo;
     $("capturedPreview").src = emp.photo || '';
@@ -488,7 +513,7 @@
   }
   function resetEmployeeForm(){
     editingEmployeeId = null;
-    $("empName").value=""; $("empPos").value="";
+    $("empName").value=""; $("empPos").value=""; $("empDept").value="";
     capturedDescriptor=null; capturedPhoto=null;
     $("capturedPreview").style.display="none";
     $("addFormTitle").textContent = "Tambah Karyawan Baru";
@@ -501,21 +526,22 @@
   $("saveEmpBtn").addEventListener('click', async ()=>{
     const name = $("empName").value.trim();
     const pos = $("empPos").value.trim();
+    const dept = $("empDept").value;
     if(!name || !capturedDescriptor) return;
     $("saveEmpBtn").disabled = true;
     if(editingEmployeeId){
-      const payload = { action:'updateEmployee', id:editingEmployeeId, name, position:pos, descriptor:capturedDescriptor.vec, descMode:capturedDescriptor.mode, photo:capturedPhoto };
+      const payload = { action:'updateEmployee', id:editingEmployeeId, name, position:pos, department:dept, descriptor:capturedDescriptor.vec, descMode:capturedDescriptor.mode, photo:capturedPhoto };
       $("saveEmpBtn").textContent = "Mengupdate...";
       try{
         await apiPost(payload);
         const idx = employees.findIndex(e=>e.id===editingEmployeeId);
-        if(idx>-1){ employees[idx] = {...employees[idx], name, position:pos, descriptor:capturedDescriptor.vec, descMode:capturedDescriptor.mode, photo:capturedPhoto}; }
+        if(idx>-1){ employees[idx] = {...employees[idx], name, position:pos, department:dept, descriptor:capturedDescriptor.vec, descMode:capturedDescriptor.mode, photo:capturedPhoto}; }
         renderEmployees();
         $("addStatus").textContent = "Karyawan berhasil diupdate! 🎉";
         resetEmployeeForm();
       }catch(err){ $("addStatus").textContent = "Gagal mengupdate, cek koneksi."; $("saveEmpBtn").textContent="Update Karyawan"; }
     } else {
-      const newEmp = { id: Date.now()+"", name, position: pos, descriptor: capturedDescriptor.vec, descMode: capturedDescriptor.mode, photo: capturedPhoto, createdAt: new Date().toISOString() };
+      const newEmp = { id: Date.now()+"", name, position: pos, department: dept, descriptor: capturedDescriptor.vec, descMode: capturedDescriptor.mode, photo: capturedPhoto, createdAt: new Date().toISOString() };
       $("saveEmpBtn").textContent = "Menyimpan...";
       try{
         await apiPost({action:'addEmployee', ...newEmp});
@@ -612,9 +638,9 @@
     const wrap = $("empTableWrap");
     const isAdmin = currentUser && currentUser.role === 'admin';
     if(employees.length===0){ wrap.innerHTML = '<div class="empty">Belum ada karyawan terdaftar.</div>'; return; }
-    let html = '<table><tr><th>Foto</th><th>Nama</th><th>ID/Jabatan</th><th>Terdaftar</th><th></th></tr>';
+    let html = '<table><tr><th>Foto</th><th>Nama</th><th>ID/Jabatan</th><th>Departemen</th><th>Terdaftar</th><th></th></tr>';
     for(const e of employees){
-      html += `<tr><td><img class="avatar" src="${e.photo||''}"></td><td>${e.name}</td><td>${e.position||'-'}</td>
+      html += `<tr><td><img class="avatar" src="${e.photo||''}"></td><td>${e.name}</td><td>${e.position||'-'}</td><td>${e.department||'-'}</td>
         <td>${new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
         <td>
           <button class="btn" data-edit="${e.id}">Edit</button>
@@ -643,10 +669,12 @@
   function renderHistory(){
     const dateFilter = $("filterDate").value;
     const mealFilter = $("filterMeal").value;
+    const deptFilter = $("filterDept").value;
     let filtered = attendance.filter(r=>{
       const d = new Date(r.timestamp); const dStr = d.toISOString().slice(0,10);
       if(dateFilter && dStr!==dateFilter) return false;
       if(mealFilter && r.meal!==mealFilter) return false;
+      if(deptFilter && r.department!==deptFilter) return false;
       return true;
     });
     const counts = {Lunch:0,Dinner:0,Supper:0};
@@ -658,23 +686,24 @@
       <div class="stat"><div class="num">${counts.Supper}</div><div class="lbl">Supper</div></div>`;
     const wrap = $("histTableWrap");
     if(filtered.length===0){ wrap.innerHTML = '<div class="empty">Belum ada data absensi.</div>'; return; }
-    let html = '<table><tr><th>Nama</th><th>ID/Jabatan</th><th>Jenis</th><th>Tanggal</th><th>Waktu</th></tr>';
+    let html = '<table><tr><th>Nama</th><th>ID/Jabatan</th><th>Departemen</th><th>Jenis</th><th>Tanggal</th><th>Waktu</th></tr>';
     for(const r of filtered){
       const d = new Date(r.timestamp);
-      html += `<tr><td>${r.name}</td><td>${r.position||'-'}</td><td>${mealTag(r.meal)}</td>
+      html += `<tr><td>${r.name}</td><td>${r.position||'-'}</td><td>${r.department||'-'}</td><td>${mealTag(r.meal)}</td>
         <td>${d.toLocaleDateString('id-ID')}</td><td>${d.toLocaleTimeString('id-ID')}</td></tr>`;
     }
     html += '</table>'; wrap.innerHTML = html;
   }
   $("filterDate").addEventListener('change', renderHistory);
   $("filterMeal").addEventListener('change', renderHistory);
-  $("clearFilterBtn").addEventListener('click', ()=>{ $("filterDate").value=""; $("filterMeal").value=""; renderHistory(); });
+  $("filterDept").addEventListener('change', renderHistory);
+  $("clearFilterBtn").addEventListener('click', ()=>{ $("filterDate").value=""; $("filterMeal").value=""; $("filterDept").value=""; renderHistory(); });
   $("refreshBtn").addEventListener('click', refreshAttendance);
 
   // ---------- EXPORT TO EXCEL ----------
   $("exportEmpBtn").addEventListener('click', ()=>{
     if(employees.length===0){ alert('Belum ada data karyawan untuk diexport.'); return; }
-    const data = employees.map(e=>({ Nama: e.name, "ID/Jabatan": e.position || '-', "Tanggal Daftar": new Date(e.createdAt).toLocaleString('id-ID') }));
+    const data = employees.map(e=>({ Nama: e.name, "ID/Jabatan": e.position || '-', Departemen: e.department || '-', "Tanggal Daftar": new Date(e.createdAt).toLocaleString('id-ID') }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Karyawan");
@@ -683,16 +712,18 @@
   $("exportHistBtn").addEventListener('click', ()=>{
     const dateFilter = $("filterDate").value;
     const mealFilter = $("filterMeal").value;
+    const deptFilter = $("filterDept").value;
     let filtered = attendance.filter(r=>{
       const d = new Date(r.timestamp); const dStr = d.toISOString().slice(0,10);
       if(dateFilter && dStr!==dateFilter) return false;
       if(mealFilter && r.meal!==mealFilter) return false;
+      if(deptFilter && r.department!==deptFilter) return false;
       return true;
     });
     if(filtered.length===0){ alert('Tidak ada data absensi untuk diexport (sesuai filter saat ini).'); return; }
     const data = filtered.map(r=>{
       const d = new Date(r.timestamp);
-      return { Nama: r.name, "ID/Jabatan": r.position || '-', "Jenis Makan": r.meal, Tanggal: d.toLocaleDateString('id-ID'), Waktu: d.toLocaleTimeString('id-ID') };
+      return { Nama: r.name, "ID/Jabatan": r.position || '-', Departemen: r.department || '-', "Jenis Makan": r.meal, Tanggal: d.toLocaleDateString('id-ID'), Waktu: d.toLocaleTimeString('id-ID') };
     });
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();

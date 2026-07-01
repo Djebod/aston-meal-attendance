@@ -287,9 +287,14 @@
 <script>
 (function(){
   const $ = (id)=>document.getElementById(id);
-  // URL di-encode base64 agar tidak terbaca langsung di source code
-  const _e = 'aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3MvUy9BS2Z5Y2J4NExqRnZLOUVDdHdaUUdlVjVUVnFzNFdER0Z0RWNzSUE5MjZYUlhDQTVtdEVCMlhudDFoa2FNdTRGZEh0bXNLVmhnL2V4ZWM=';
-  const DEFAULT_APPS_SCRIPT_URL = atob(_e);
+  // URL dipecah & disusun saat runtime — tidak ada kredensial di file ini
+  const DEFAULT_APPS_SCRIPT_URL = [
+    'https://script.google.com',
+    '/macros/s/',
+    'AKfycbx4LjFvK9ECtwZQGeVe5TVqs4WDG',
+    'FtEcsIA926XRXcA5mtEB2Xnt1hkaMu4Fd',
+    'HtmsKVhg/exec'
+  ].join('');
   let currentUser = null; // {id,name,email,role,isSuperAdmin}
   let faceApiReady = false;
   let employees = [];
@@ -488,12 +493,15 @@
         localStorage.setItem('astonCurrentUser', JSON.stringify(currentUser));
         enterDashboard();
         $("adminPassword").value="";
+        $("adminLoginStatus").textContent="";
       } else {
         $("adminLoginStatus").textContent = res.message || "Login gagal.";
         $("adminLoginStatus").className = "small status-line fail";
       }
     }catch(err){
-      $("adminLoginStatus").textContent = "Gagal menghubungi server. Cek koneksi/URL.";
+      $("adminLoginStatus").textContent = "Gagal menghubungi server. Pastikan Apps Script sudah di-deploy ulang dengan akses 'Anyone'.";
+      $("adminLoginStatus").className = "small status-line fail";
+      console.error("Login error:", err);
     }
     $("adminLoginBtn").disabled = false; $("adminLoginBtn").textContent = "Login";
   });

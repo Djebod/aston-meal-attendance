@@ -287,11 +287,10 @@
 <script>
 (function(){
   const $ = (id)=>document.getElementById(id);
-  // Tempel URL Apps Script Anda di sini (diakhiri /exec) agar semua device otomatis tersambung
-  // tanpa perlu input manual. Biarkan "" jika ingin tetap pakai layar Setup Awal manual.
-  const DEFAULT_APPS_SCRIPT_URL = "";
-  const SUPER_ADMIN_EMAILS = ['syam.rakhmany@gmail.com','itm@astoncirebon.com'];
-  let currentUser = null; // {id,name,email,role}
+  // URL di-encode base64 agar tidak terbaca langsung di source code
+  const _e = 'aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3MvUy9BS2Z5Y2J4NExqRnZLOUVDdHdaUUdlVjVUVnFzNFdER0Z0RWNzSUE5MjZYUlhDQTVtdEVCMlhudDFoa2FNdTRGZEh0bXNLVmhnL2V4ZWM=';
+  const DEFAULT_APPS_SCRIPT_URL = atob(_e);
+  let currentUser = null; // {id,name,email,role,isSuperAdmin}
   let faceApiReady = false;
   let employees = [];
   let attendance = [];
@@ -515,7 +514,7 @@
   }
   function applyRolePermissions(){
     const isAdmin = currentUser && currentUser.role === 'admin';
-    const isSuperAdmin = currentUser && SUPER_ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
+    const isSuperAdmin = currentUser && currentUser.isSuperAdmin === true;
     document.querySelectorAll('.admin-only').forEach(el=> el.style.display = isAdmin ? '' : 'none');
     document.querySelectorAll('.super-admin-only').forEach(el=> el.style.display = isSuperAdmin ? '' : 'none');
     const activeSub = document.querySelector('.subtab.active');

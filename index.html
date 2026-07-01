@@ -39,6 +39,9 @@
     border:3px dashed rgba(0,194,168,0.65);border-radius:50%;pointer-events:none;}
   .face-guide-label{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:.68rem;
     color:rgba(255,255,255,.85);pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.7);font-weight:600;}
+  .scan-anim{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);
+    margin-right:6px;animation:blink 1.2s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(.7);}}
   .meal-badge{display:inline-block;margin:14px auto 6px;padding:6px 16px;border-radius:999px;font-weight:700;
     font-size:.85rem;background:rgba(0,194,168,.15);color:var(--accent);border:1px solid rgba(0,194,168,.4);}
   .meal-badge.off{background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--panel-border);}
@@ -133,7 +136,7 @@
         <div class="scan-ring" id="staffRing"></div>
       </div>
       <div id="mealBadge" class="meal-badge off">Memuat jam...</div><br>
-      <button id="absenBtn" class="big-btn" disabled>Memuat kamera...</button>
+      <div id="scanStatus" class="status-line">Menginisialisasi kamera...</div>
       <div id="staffStatus" class="status-line"></div>
     </div>
   </div>
@@ -286,7 +289,7 @@
   const $ = (id)=>document.getElementById(id);
   // Tempel URL Apps Script Anda di sini (diakhiri /exec) agar semua device otomatis tersambung
   // tanpa perlu input manual. Biarkan "" jika ingin tetap pakai layar Setup Awal manual.
-  const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx4LjFvK9ECtwZQGeVe5TVqs4WDGFtEcsIA926XRXcA5mtEB2Xnt1hkaMu4FdHtmsKVhg/exec";
+  const DEFAULT_APPS_SCRIPT_URL = "";
   const SUPER_ADMIN_EMAILS = ['syam.rakhmany@gmail.com','itm@astoncirebon.com'];
   let currentUser = null; // {id,name,email,role}
   let faceApiReady = false;
@@ -312,7 +315,6 @@
     const el = $("mealBadge");
     if(m){ el.textContent = "Jam makan aktif: "+m; el.className="meal-badge"; }
     else { el.textContent = "Di luar jam makan"; el.className="meal-badge off"; }
-    $("absenBtn").disabled = !m || !cameraStarted;
   }
   setInterval(updateMealBadge, 15000);
 
@@ -387,7 +389,10 @@
     try{
       const stream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
       videoEl.srcObject = stream;
-      if(which==='staff'){ staffStream=stream; cameraStarted=true; updateMealBadge(); $("absenBtn").textContent="Absen Makan"; }
+      if(which==='staff'){
+        staffStream=stream; cameraStarted=true; updateMealBadge();
+        videoEl.onloadedmetadata = ()=>{ setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active'); autoScanLoop(); };
+      }
       if(which==='admin'){ adminStream=stream; }
     }catch(err){
       if(which==='staff'){
@@ -397,48 +402,79 @@
     }
   }
 
-  // ---------- STAFF ABSEN ----------
-  $("absenBtn").addEventListener('click', async ()=>{
-    const meal = getMealType(new Date());
-    if(!meal) return;
-    const btn = $("absenBtn"); const ring = $("staffRing"); const status = $("staffStatus");
-    btn.disabled = true; ring.className="scan-ring scanning";
-    status.textContent = "Mendeteksi wajah..."; status.className="status-line";
-    await new Promise(r=>setTimeout(r,500));
-    const desc = await getDescriptor($("staffVideo"));
-    if(!desc){
-      ring.className="scan-ring fail"; status.textContent="Wajah tidak terdeteksi, coba lagi.";
-      status.className="status-line fail"; btn.disabled=false;
-      setTimeout(()=>ring.className="scan-ring",1500);
-      return;
-    }
-    const match = findMatch(desc);
-    if(match){
-      // refresh attendance dari server dulu agar pengecekan duplikat akurat lintas device
-      try{ await refreshAttendance(); }catch(err){}
-      const todayStr = new Date().toDateString();
-      const alreadyDone = attendance.some(r=> r.employeeId===match.id && r.meal===meal && new Date(r.timestamp).toDateString()===todayStr);
-      if(alreadyDone){
-        ring.className="scan-ring fail";
-        status.textContent = `⚠️ ${match.name} sudah absen ${meal} hari ini.`;
-        status.className="status-line fail";
-        setTimeout(()=>{ ring.className="scan-ring"; btn.disabled=false; status.textContent=""; status.className="status-line"; },2500);
-        return;
+  // ---------- AUTO SCAN ----------
+  let scanning = false;
+  let scanCooldown = false; // cooldown setelah berhasil/gagal agar tidak spam
+
+  function setScanStatus(msg, type=''){
+    const el = $("scanStatus");
+    el.innerHTML = type==='active' ? `<span class="scan-anim"></span>${msg}` : msg;
+    el.className = "status-line" + (type==='ok' ? ' ok' : type==='fail' ? ' fail' : '');
+  }
+
+  async function autoScanLoop(){
+    if(scanning) return;
+    scanning = true;
+    while(true){
+      await new Promise(r=>setTimeout(r,800)); // interval antar scan
+      if(scanCooldown){ continue; }
+      const meal = getMealType(new Date());
+      if(!meal){
+        setScanStatus("Di luar jam makan — scan tidak aktif.");
+        $("staffRing").className="scan-ring";
+        continue;
       }
-      ring.className="scan-ring ok";
-      status.textContent = `✅ ${match.name} — ${meal} tercatat!`;
-      status.className="status-line ok";
-      const record = {id:Date.now()+"", employeeId:match.id, name:match.name, position:match.position, department:match.department||'', meal, timestamp:new Date().toISOString()};
-      attendance.unshift(record);
-      renderHistory();
-      apiPost({action:'addAttendance', ...record}).catch(()=>{});
-    } else {
-      ring.className="scan-ring fail";
-      status.textContent = "❌ Wajah tidak dikenali / belum terdaftar.";
-      status.className="status-line fail";
+      const vid = $("staffVideo");
+      if(!vid.srcObject || vid.readyState < 2){ continue; }
+      setScanStatus("Memindai wajah...", 'active');
+      $("staffRing").className="scan-ring scanning";
+      const desc = await getDescriptor(vid);
+      if(!desc){
+        // tidak ada wajah di frame, reset saja — tidak tampilkan pesan error agar tidak mengganggu
+        $("staffRing").className="scan-ring";
+        setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active');
+        continue;
+      }
+      const match = findMatch(desc);
+      if(match){
+        scanCooldown = true;
+        $("staffRing").className="scan-ring ok";
+        // cek duplikat hari ini
+        try{ await refreshAttendance(); }catch(e){}
+        const todayStr = new Date().toDateString();
+        const alreadyDone = attendance.some(r=> r.employeeId===match.id && r.meal===meal && new Date(r.timestamp).toDateString()===todayStr);
+        if(alreadyDone){
+          setScanStatus(`⚠️ ${match.name} sudah absen ${meal} hari ini.`, 'fail');
+          $("staffRing").className="scan-ring fail";
+          $("staffStatus").textContent="";
+          await new Promise(r=>setTimeout(r,3000));
+          $("staffRing").className="scan-ring";
+          setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active');
+          scanCooldown = false;
+          continue;
+        }
+        const record = {id:Date.now()+"", employeeId:match.id, name:match.name, position:match.position, department:match.department||'', meal, timestamp:new Date().toISOString()};
+        attendance.unshift(record);
+        renderHistory();
+        apiPost({action:'addAttendance', ...record}).catch(()=>{});
+        setScanStatus(`✅ ${match.name} — ${meal} berhasil tercatat!`, 'ok');
+        $("staffStatus").textContent = "";
+        await new Promise(r=>setTimeout(r,4000)); // jeda 4 detik sebelum scan lagi
+        $("staffRing").className="scan-ring";
+        setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active');
+        scanCooldown = false;
+      } else {
+        // wajah terdeteksi tapi tidak cocok
+        $("staffRing").className="scan-ring fail";
+        setScanStatus("❌ Wajah tidak dikenali / belum terdaftar.", 'fail');
+        scanCooldown = true;
+        await new Promise(r=>setTimeout(r,2500));
+        $("staffRing").className="scan-ring";
+        setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active');
+        scanCooldown = false;
+      }
     }
-    setTimeout(()=>{ ring.className="scan-ring"; btn.disabled=false; status.textContent=""; status.className="status-line"; },2500);
-  });
+  }
 
   // ---------- LOGIN (server-verified) ----------
   $("adminLoginBtn").addEventListener('click', async ()=>{

@@ -93,6 +93,10 @@
   .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
   .small{font-size:.75rem;color:var(--muted);text-align:center;margin-top:6px;}
   .photo-preview{width:90px;height:90px;border-radius:50%;object-fit:cover;display:block;margin:10px auto;border:2px solid var(--panel-border);}
+  .cam-toggle{display:flex;gap:6px;justify-content:center;margin-bottom:10px;}
+  .cam-toggle button{padding:6px 14px;font-size:.75rem;border-radius:999px;border:1px solid var(--panel-border);
+    background:transparent;color:var(--muted);cursor:pointer;transition:.2s;}
+  .cam-toggle button.active{background:rgba(0,194,168,.15);color:var(--accent);border-color:rgba(0,194,168,.4);}
   #gate{position:fixed;inset:0;background:#0b0f12;display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;}
   #gate .box{max-width:420px;width:100%;}
   .topbar-admin{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;
@@ -170,6 +174,10 @@
 
       <div id="sub-add" class="panel">
         <h2 id="addFormTitle">Tambah Karyawan Baru</h2>
+        <div class="cam-toggle">
+          <button id="camFrontBtn" class="active">🤳 Kamera Depan</button>
+          <button id="camBackBtn">📷 Kamera Belakang</button>
+        </div>
         <div class="cam-box" style="max-width:300px;margin-bottom:14px;">
           <video id="adminVideo" autoplay muted playsinline></video>
           <div class="face-guide"></div>
@@ -301,6 +309,7 @@
   let attendance = [];
   let appsScriptUrl = "";
   let staffStream, adminStream, cameraStarted=false;
+  let adminFacing = 'user'; // 'user' = depan, 'environment' = belakang
   let capturedDescriptor = null, capturedPhoto = null;
   let editingEmployeeId = null;
 
@@ -389,9 +398,14 @@
   }
 
   // ---------- CAMERA ----------
-  async function startCamera(videoEl, which){
+  function stopStream(stream){ if(stream){ stream.getTracks().forEach(t=>t.stop()); } }
+
+  async function startCamera(videoEl, which, facing='user'){
     try{
-      const stream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
+      const constraints = which==='staff'
+        ? {video:{facingMode:'user', width:320, height:240}}
+        : {video:{facingMode:facing, width:320, height:240}};
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       videoEl.srcObject = stream;
       if(which==='staff'){
         staffStream=stream; cameraStarted=true; updateMealBadge();
@@ -405,6 +419,20 @@
       }
     }
   }
+
+  async function switchAdminCamera(facing){
+    adminFacing = facing;
+    stopStream(adminStream); adminStream=null;
+    const vid = $("adminVideo"); vid.srcObject=null;
+    // mirror hanya untuk kamera depan
+    vid.style.transform = facing==='user' ? 'scaleX(-1)' : 'scaleX(1)';
+    await startCamera(vid, 'admin', facing);
+    $("camFrontBtn").classList.toggle('active', facing==='user');
+    $("camBackBtn").classList.toggle('active', facing==='environment');
+  }
+
+  $("camFrontBtn").addEventListener('click', ()=>{ if(adminFacing!=='user') switchAdminCamera('user'); });
+  $("camBackBtn").addEventListener('click', ()=>{ if(adminFacing!=='environment') switchAdminCamera('environment'); });
 
   // ---------- AUTO SCAN ----------
   let scanning = false;
@@ -789,10 +817,17 @@
   $("tabStaffBtn").addEventListener('click', ()=>{
     $("tabStaffBtn").classList.add('active'); $("tabAdminBtn").classList.remove('active');
     $("staffView").style.display=""; $("adminView").style.display="none";
+    // hidupkan kembali kamera staff
+    if(!staffStream){ startCamera($("staffVideo"),'staff'); }
+    // matikan kamera admin untuk hemat resource
+    stopStream(adminStream); adminStream=null; $("adminVideo").srcObject=null;
   });
   $("tabAdminBtn").addEventListener('click', ()=>{
     $("tabAdminBtn").classList.add('active'); $("tabStaffBtn").classList.remove('active');
     $("adminView").style.display=""; $("staffView").style.display="none";
+    // matikan kamera staff (auto-scan berhenti karena tidak ada stream)
+    stopStream(staffStream); staffStream=null; cameraStarted=false;
+    $("staffVideo").srcObject=null;
     if(currentUser){ enterDashboard(); } else { $("adminLoginGate").style.display=""; $("adminContent").style.display="none"; }
   });
   document.querySelectorAll('.subtab').forEach(btn=>{
@@ -803,6 +838,12 @@
       if(btn.dataset.sub==='hist') refreshAttendance();
       if(btn.dataset.sub==='emp') refreshEmployees();
       if(btn.dataset.sub==='users') refreshUsers();
+      // hidupkan kamera admin hanya saat di tab Tambah Karyawan
+      if(btn.dataset.sub==='add'){
+        if(!adminStream) startCamera($("adminVideo"),'admin', adminFacing);
+      } else {
+        stopStream(adminStream); adminStream=null; $("adminVideo").srcObject=null;
+      }
     });
   });
 

@@ -215,6 +215,10 @@
           <h2 style="margin:0;">Data Karyawan Terdaftar</h2>
           <button id="exportEmpBtn" class="btn">📥 Export ke Excel</button>
         </div>
+        <div class="filters" style="margin-bottom:14px;">
+          <input type="text" id="searchEmp" placeholder="🔍 Cari nama karyawan..." style="flex:1;min-width:180px;">
+          <button class="btn" id="clearSearchBtn">Reset</button>
+        </div>
         <div id="empTableWrap"></div>
       </div>
 
@@ -721,10 +725,20 @@
   function renderEmployees(){
     const wrap = $("empTableWrap");
     const isAdmin = currentUser && currentUser.role === 'admin';
-    if(employees.length===0){ wrap.innerHTML = '<div class="empty">Belum ada karyawan terdaftar.</div>'; return; }
+    const keyword = ($("searchEmp") ? $("searchEmp").value.trim().toLowerCase() : '');
+    let list = [...employees];
+    // filter pencarian
+    if(keyword) list = list.filter(e=>e.name.toLowerCase().includes(keyword));
+    // urutkan A-Z
+    list.sort((a,b)=>a.name.localeCompare(b.name,'id'));
+    if(list.length===0){ wrap.innerHTML = '<div class="empty">Tidak ada karyawan yang ditemukan.</div>'; return; }
     let html = '<table><tr><th>Foto</th><th>Nama</th><th>ID/Jabatan</th><th>Departemen</th><th>Terdaftar</th><th></th></tr>';
-    for(const e of employees){
-      html += `<tr><td><img class="avatar" src="${e.photo||''}"></td><td>${e.name}</td><td>${e.position||'-'}</td><td>${e.department||'-'}</td>
+    for(const e of list){
+      html += `<tr>
+        <td><img class="avatar" src="${e.photo||''}"></td>
+        <td>${e.name.toUpperCase()}</td>
+        <td>${(e.position||'-').toUpperCase()}</td>
+        <td>${(e.department||'-').toUpperCase()}</td>
         <td>${new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
         <td>
           <button class="btn" data-edit="${e.id}">Edit</button>
@@ -750,6 +764,8 @@
       });
     });
   }
+  document.addEventListener('input', e=>{ if(e.target.id==='searchEmp') renderEmployees(); });
+  document.addEventListener('click', e=>{ if(e.target.id==='clearSearchBtn'){ $("searchEmp").value=''; renderEmployees(); } });
   function renderHistory(){
     const dateFilter = $("filterDate").value;
     const mealFilter = $("filterMeal").value;

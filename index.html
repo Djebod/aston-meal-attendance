@@ -164,7 +164,7 @@
       </div>
 
       <div class="subtabbar">
-        <button class="subtab active" data-sub="add">➕ Tambah Karyawan</button>
+        <button class="subtab admin-only active" data-sub="add">➕ Tambah Karyawan</button>
         <button class="subtab" data-sub="emp">📋 Data Karyawan</button>
         <button class="subtab" data-sub="hist">🕘 Riwayat Absensi</button>
         <button class="subtab" data-sub="pass">🔑 Ubah Password</button>
@@ -741,7 +741,7 @@
         <td>${(e.department||'-').toUpperCase()}</td>
         <td>${new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
         <td>
-          <button class="btn" data-edit="${e.id}">Edit</button>
+          ${isAdmin ? `<button class="btn" data-edit="${e.id}">Edit</button>` : ''}
           ${isAdmin ? `<button class="btn danger" data-del="${e.id}">Hapus</button>` : ''}
         </td></tr>`;
     }
@@ -786,11 +786,11 @@
       <div class="stat"><div class="num">${counts.Supper}</div><div class="lbl">Supper</div></div>`;
     const wrap = $("histTableWrap");
     if(filtered.length===0){ wrap.innerHTML = '<div class="empty">Belum ada data absensi.</div>'; return; }
-    let html = '<table><tr><th>Nama</th><th>ID/Jabatan</th><th>Departemen</th><th>Jenis</th><th>Tanggal</th><th>Waktu</th></tr>';
+    let html = '<table><tr><th>NAMA</th><th>ID/JABATAN</th><th>DEPARTEMEN</th><th>JENIS</th><th>TANGGAL</th><th>WAKTU</th></tr>';
     for(const r of filtered){
       const d = new Date(r.timestamp);
-      html += `<tr><td>${r.name}</td><td>${r.position||'-'}</td><td>${r.department||'-'}</td><td>${mealTag(r.meal)}</td>
-        <td>${d.toLocaleDateString('id-ID')}</td><td>${d.toLocaleTimeString('id-ID')}</td></tr>`;
+      html += `<tr><td>${r.name.toUpperCase()}</td><td>${(r.position||'-').toUpperCase()}</td><td>${(r.department||'-').toUpperCase()}</td><td>${mealTag(r.meal.toUpperCase())}</td>
+        <td>${d.toLocaleDateString('id-ID').toUpperCase()}</td><td>${d.toLocaleTimeString('id-ID')}</td></tr>`;
     }
     html += '</table>'; wrap.innerHTML = html;
   }

@@ -177,12 +177,23 @@
         <div class="cam-toggle">
           <button id="camFrontBtn" class="active">🤳 Kamera Depan</button>
           <button id="camBackBtn">📷 Kamera Belakang</button>
+          <button id="uploadModeBtn">📁 Upload Foto</button>
         </div>
-        <div class="cam-box" style="max-width:300px;margin-bottom:14px;">
-          <video id="adminVideo" autoplay muted playsinline></video>
-          <div class="face-guide"></div>
-          <div class="face-guide-label">Posisikan wajah di dalam oval</div>
-          <div class="scan-ring" id="adminRing"></div>
+        <div id="camSection">
+          <div class="cam-box" style="max-width:300px;margin-bottom:14px;">
+            <video id="adminVideo" autoplay muted playsinline></video>
+            <div class="face-guide"></div>
+            <div class="face-guide-label">Posisikan wajah di dalam oval</div>
+            <div class="scan-ring" id="adminRing"></div>
+          </div>
+        </div>
+        <div id="uploadSection" style="display:none;max-width:300px;margin:0 auto 14px;">
+          <label for="uploadPhoto" style="display:block;border:2px dashed var(--panel-border);border-radius:var(--radius);
+            padding:30px;text-align:center;cursor:pointer;color:var(--muted);font-size:.85rem;transition:.2s;"
+            id="uploadLabel">
+            🖼️ Klik untuk pilih foto wajah<br><span style="font-size:.75rem;">(JPG/PNG, wajah tampak jelas)</span>
+          </label>
+          <input type="file" id="uploadPhoto" accept="image/*" style="display:none;">
         </div>
         <div class="form-grid">
           <input type="text" id="empName" placeholder="Nama Karyawan">
@@ -201,7 +212,9 @@
             <option value="EAGLE">EAGLE</option>
             <option value="MANULIFE">MANULIFE</option>
           </select>
-          <div class="row"><button id="captureFaceBtn" class="btn">📸 Ambil/Ganti Foto Wajah</button></div>
+          <div class="row">
+            <button id="captureFaceBtn" class="btn">📸 Ambil Foto dari Kamera</button>
+          </div>
           <img id="capturedPreview" class="photo-preview" style="display:none;">
           <div id="addStatus" class="small"></div>
           <div class="row">
@@ -317,7 +330,22 @@
   let attendance = [];
   let appsScriptUrl = "";
   let staffStream, adminStream, cameraStarted=false;
-  let adminFacing = 'user'; // 'user' = depan, 'environment' = belakang
+  let adminFacing = 'user';
+  let inputMode = 'camera'; // 'camera' | 'upload'
+
+  function setInputMode(mode){
+    inputMode = mode;
+    $("camSection").style.display   = mode==='camera' ? '' : 'none';
+    $("uploadSection").style.display = mode==='upload' ? '' : 'none';
+    $("camFrontBtn").classList.toggle('active', mode==='camera' && adminFacing==='user');
+    $("camBackBtn").classList.toggle('active', mode==='camera' && adminFacing==='environment');
+    $("uploadModeBtn").classList.toggle('active', mode==='upload');
+    if(mode==='camera'){
+      if(!adminStream) startCamera($("adminVideo"),'admin', adminFacing);
+    } else {
+      stopStream(adminStream); adminStream=null; $("adminVideo").srcObject=null;
+    }
+  }
   let capturedDescriptor = null, capturedPhoto = null;
   let editingEmployeeId = null;
 
@@ -439,8 +467,68 @@
     $("camBackBtn").classList.toggle('active', facing==='environment');
   }
 
-  $("camFrontBtn").addEventListener('click', ()=>{ if(adminFacing!=='user') switchAdminCamera('user'); });
-  $("camBackBtn").addEventListener('click', ()=>{ if(adminFacing!=='environment') switchAdminCamera('environment'); });
+  $("camFrontBtn").addEventListener('click', ()=>{ inputMode='camera'; adminFacing='user'; setInputMode('camera'); });
+  $("camBackBtn").addEventListener('click', ()=>{ inputMode='camera'; adminFacing='environment'; setInputMode('camera'); });
+  $("uploadModeBtn").addEventListener('click', ()=> setInputMode('upload'));
+
+  // Upload foto dari file
+  $("uploadPhoto").addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    $("addStatus").textContent = "Memproses foto...";
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = async ()=>{
+      // resize untuk preview
+      const c = document.createElement('canvas'); c.width=100; c.height=100;
+      const ctx = c.getContext('2d');
+      // crop center square
+      const size = Math.min(img.width, img.height);
+      const ox = (img.width-size)/2, oy = (img.height-size)/2;
+      ctx.drawImage(img, ox, oy, size, size, 0, 0, 100, 100);
+      capturedPhoto = c.toDataURL('image/jpeg', 0.7);
+      $("capturedPreview").src = capturedPhoto;
+      $("capturedPreview").style.display = "block";
+      $("uploadLabel").textContent = "✅ " + file.name;
+
+      if(faceApiReady){
+        // buat img element untuk face-api
+        const fImg = document.createElement('img');
+        fImg.src = url;
+        fImg.onload = async ()=>{
+          try{
+            const det = await faceapi.detectSingleFace(fImg,
+              new faceapi.TinyFaceDetectorOptions({inputSize:320, scoreThreshold:0.25}))
+              .withFaceLandmarks().withFaceDescriptor();
+            if(!det){
+              $("addStatus").textContent = "⚠️ Wajah tidak terdeteksi di foto ini. Gunakan foto yang lebih jelas.";
+              capturedDescriptor = null;
+            } else {
+              capturedDescriptor = {vec: Array.from(det.descriptor), mode:'ai'};
+              $("addStatus").textContent = "Foto berhasil diproses ✅ Wajah terdeteksi.";
+            }
+          }catch(err){
+            $("addStatus").textContent = "Gagal memproses foto.";
+          }
+          URL.revokeObjectURL(url);
+          checkSaveEnable();
+        };
+      } else {
+        // fallback basic mode
+        const c2 = document.createElement('canvas'); c2.width=24; c2.height=24;
+        const ctx2 = c2.getContext('2d');
+        ctx2.drawImage(img, ox, oy, size, size, 0, 0, 24, 24);
+        const data = ctx2.getImageData(0,0,24,24).data;
+        const vec = [];
+        for(let i=0;i<data.length;i+=4){ vec.push((data[i]+data[i+1]+data[i+2])/3/255); }
+        capturedDescriptor = {vec, mode:'basic'};
+        $("addStatus").textContent = "Foto diproses (mode dasar) ✅";
+        URL.revokeObjectURL(url);
+        checkSaveEnable();
+      }
+    };
+    img.src = url;
+  });
 
   // ---------- AUTO SCAN ----------
   let scanning = false;
@@ -570,6 +658,7 @@
 
   // ---------- ADMIN: ADD / EDIT EMPLOYEE ----------
   $("captureFaceBtn").addEventListener('click', async ()=>{
+    if(inputMode !== 'camera') return;
     $("addStatus").textContent = "Mendeteksi wajah...";
     const desc = await getDescriptor($("adminVideo"));
     if(!desc){ $("addStatus").textContent = "Wajah tidak terdeteksi, posisikan wajah di tengah oval."; return; }
@@ -606,6 +695,8 @@
     $("empName").value=""; $("empPos").value=""; $("empDept").value="";
     capturedDescriptor=null; capturedPhoto=null;
     $("capturedPreview").style.display="none";
+    $("uploadPhoto").value="";
+    $("uploadLabel").innerHTML = '🖼️ Klik untuk pilih foto wajah<br><span style="font-size:.75rem;">(JPG/PNG, wajah tampak jelas)</span>';
     $("addFormTitle").textContent = "Tambah Karyawan Baru";
     $("saveEmpBtn").textContent = "Simpan Karyawan";
     $("cancelEditBtn").style.display = "none";

@@ -138,6 +138,15 @@
         <div class="face-guide"></div>
         <div class="face-guide-label">Posisikan wajah di dalam oval</div>
         <div class="scan-ring" id="staffRing"></div>
+        <div id="confirmOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.88);
+          border-radius:var(--radius);flex-direction:column;align-items:center;justify-content:center;z-index:10;">
+          <img id="confirmPhoto" style="width:80px;height:80px;border-radius:50%;object-fit:cover;
+            border:3px solid var(--success);margin-bottom:10px;">
+          <div id="confirmName" style="font-weight:800;font-size:1.05rem;color:var(--success);text-align:center;padding:0 10px;"></div>
+          <div id="confirmDept" style="font-size:.75rem;color:var(--muted);margin-top:4px;"></div>
+          <div id="confirmMeal" style="margin-top:6px;font-size:.8rem;color:var(--accent);font-weight:700;"></div>
+          <div id="confirmCountdown" style="margin-top:10px;font-size:.78rem;color:var(--muted);"></div>
+        </div>
       </div>
       <div id="mealBadge" class="meal-badge off">Memuat jam...</div><br>
       <div id="scanStatus" class="status-line">Menginisialisasi kamera...</div>
@@ -428,9 +437,27 @@
       const d = dist(desc.vec, emp.descriptor);
       if(d<bestD){ bestD=d; best=emp; }
     }
-    const threshold = desc.mode==='ai' ? 0.55 : 0.18;
-    if(best && bestD<threshold) return best;
+    // threshold diperketat: 0.42 (AI) / 0.15 (basic) untuk kurangi false match
+    const threshold = desc.mode==='ai' ? 0.42 : 0.15;
+    if(best && bestD<threshold) return {emp:best, score:bestD};
     return null;
+  }
+
+  // Ambil rata-rata dari beberapa sample descriptor untuk akurasi lebih baik
+  async function getMultiSampleDescriptor(videoEl, count=3){
+    const samples = [];
+    for(let i=0; i<count; i++){
+      const d = await getDescriptor(videoEl);
+      if(d) samples.push(d.vec);
+      if(i<count-1) await new Promise(r=>setTimeout(r,200));
+    }
+    if(samples.length===0) return null;
+    const mode = faceApiReady ? 'ai' : 'basic';
+    // rata-ratakan semua sample
+    const avgVec = samples[0].map((_,idx)=>
+      samples.reduce((sum,s)=>sum+s[idx], 0) / samples.length
+    );
+    return {vec: avgVec, mode};
   }
 
   // ---------- CAMERA ----------
@@ -544,7 +571,7 @@
     if(scanning) return;
     scanning = true;
     while(true){
-      await new Promise(r=>setTimeout(r,800)); // interval antar scan
+      await new Promise(r=>setTimeout(r,800));
       if(scanCooldown){ continue; }
       const meal = getMealType(new Date());
       if(!meal){
@@ -556,43 +583,65 @@
       if(!vid.srcObject || vid.readyState < 2){ continue; }
       setScanStatus("Memindai wajah...", 'active');
       $("staffRing").className="scan-ring scanning";
-      const desc = await getDescriptor(vid);
+
+      // ambil 3 sample sekaligus untuk akurasi lebih baik
+      const desc = await getMultiSampleDescriptor(vid, 3);
       if(!desc){
-        // tidak ada wajah di frame, reset saja — tidak tampilkan pesan error agar tidak mengganggu
         $("staffRing").className="scan-ring";
         setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active');
         continue;
       }
-      const match = findMatch(desc);
-      if(match){
+
+      const result = findMatch(desc);
+      if(result){
+        const match = result.emp;
         scanCooldown = true;
-        $("staffRing").className="scan-ring ok";
-        // cek duplikat hari ini
+        // cek duplikat
         try{ await refreshAttendance(); }catch(e){}
         const todayStr = new Date().toDateString();
-        const alreadyDone = attendance.some(r=> r.employeeId===match.id && r.meal===meal && new Date(r.timestamp).toDateString()===todayStr);
+        const alreadyDone = attendance.some(r=>
+          r.employeeId===match.id && r.meal===meal &&
+          new Date(r.timestamp).toDateString()===todayStr
+        );
         if(alreadyDone){
-          setScanStatus(`⚠️ ${match.name} sudah absen ${meal} hari ini.`, 'fail');
           $("staffRing").className="scan-ring fail";
-          $("staffStatus").textContent="";
+          setScanStatus(`⚠️ ${match.name.toUpperCase()} sudah absen ${meal} hari ini.`, 'fail');
           await new Promise(r=>setTimeout(r,3000));
           $("staffRing").className="scan-ring";
           setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active');
           scanCooldown = false;
           continue;
         }
-        const record = {id:Date.now()+"", employeeId:match.id, name:match.name, position:match.position, department:match.department||'', meal, timestamp:new Date().toISOString()};
+
+        // tampilkan konfirmasi visual 3 detik sebelum catat
+        $("staffRing").className="scan-ring ok";
+        setScanStatus("Wajah dikenali, mengkonfirmasi...", 'ok');
+        const ov = $("confirmOverlay");
+        $("confirmPhoto").src = match.photo || '';
+        $("confirmName").textContent = match.name.toUpperCase();
+        $("confirmDept").textContent = (match.department||'').toUpperCase();
+        $("confirmMeal").textContent = `✅ ${meal}`;
+        ov.style.display = 'flex';
+        for(let cd=3; cd>=1; cd--){
+          $("confirmCountdown").textContent = `Mencatat dalam ${cd} detik...`;
+          await new Promise(r=>setTimeout(r,1000));
+        }
+        ov.style.display = 'none';
+
+        const record = {
+          id:Date.now()+"", employeeId:match.id, name:match.name,
+          position:match.position, department:match.department||'',
+          meal, timestamp:new Date().toISOString()
+        };
         attendance.unshift(record);
         renderHistory();
         apiPost({action:'addAttendance', ...record}).catch(()=>{});
-        setScanStatus(`✅ ${match.name} — ${meal} berhasil tercatat!`, 'ok');
-        $("staffStatus").textContent = "";
-        await new Promise(r=>setTimeout(r,4000)); // jeda 4 detik sebelum scan lagi
+        setScanStatus(`✅ ${match.name.toUpperCase()} — ${meal} berhasil tercatat!`, 'ok');
+        await new Promise(r=>setTimeout(r,3000));
         $("staffRing").className="scan-ring";
         setScanStatus("Arahkan wajah ke kamera untuk absen...", 'active');
         scanCooldown = false;
       } else {
-        // wajah terdeteksi tapi tidak cocok
         $("staffRing").className="scan-ring fail";
         setScanStatus("❌ Wajah tidak dikenali / belum terdaftar.", 'fail');
         scanCooldown = true;
